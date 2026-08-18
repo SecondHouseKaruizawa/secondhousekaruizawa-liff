@@ -88,7 +88,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${renderLangSelectorHtml()}
       <h2>${t('selectFacility')}</h2>
     `;
-    APP_CONFIG.facilities.forEach(facility => {
+    
+    // 現在選択中の言語に応じた施設リストを安全に取得
+    const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
+
+    currentFacilities.forEach(facility => {
       html += `<button class="btn btn-primary btn-facility" data-id="${facility.id}" data-name="${facility.name}">${facility.name}</button>`;
     });
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;

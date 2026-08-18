@@ -4,13 +4,33 @@ const APP_CONFIG = {
   "LIFF_ID": "2011150909-rbXdgDNt", 
   "GAS_URL": "https://script.google.com/macros/s/AKfycbwMfBZIxZFhA8KFYR3JF044xyGi0cJaEwojsCYkviXoUFpL3IVf_XfuT9NYcbs0HgwtQg/exec", 
 
-  // ▼ 施設一覧マスタ
-  "facilities": [
-    { "id": "sc", "name": "sch-sch" },
-    { "id": "Hp", "name": "Hoppotta" },
-    { "id": "ku", "name": "kukka" },
-    { "id": "LU", "name": "LUONTO" }
-  ],
+  // ▼ 施設一覧マスタ（言語別に設定）
+  "facilities": {
+    "ja": [
+      { "id": "sc", "name": "sch-sch" },
+      { "id": "Hp", "name": "ホッポッタ" },
+      { "id": "ku", "name": "kukka" },
+      { "id": "LU", "name": "LUONTO" }
+    ],
+    "en": [
+      { "id": "sc", "name": "sch-sch" },
+      { "id": "Hp", "name": "Hoppotta" },
+      { "id": "ku", "name": "kukka" },
+      { "id": "LU", "name": "LUONTO" }
+    ],
+    "zh-TW": [
+      { "id": "sc", "name": "sch-sch" },
+      { "id": "Hp", "name": "Hoppotta" },
+      { "id": "ku", "name": "kukka" },
+      { "id": "LU", "name": "LUONTO" }
+    ],
+    "zh-CN": [
+      { "id": "sc", "name": "sch-sch" },
+      { "id": "Hp", "name": "Hoppotta" },
+      { "id": "ku", "name": "kukka" },
+      { "id": "LU", "name": "LUONTO" }
+    ]
+  },
 
   // ▼ 言語別アンケートURLマスタ
   "surveyUrls": {
