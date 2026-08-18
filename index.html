@@ -7,14 +7,15 @@
   <style>
     /* ベースのシンプルなデザイン */
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding: 20px; }
-    h2 { font-size: 18px; margin-bottom: 15px; text-align: center; }
+    h2 { font-size: 18px; margin-bottom: 15px; text-align: center; line-height: 1.4; }
     .container { max-width: 400px; margin: 0 auto; background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     .btn { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; text-align: center; box-sizing: border-box; transition: 0.2s; }
     .btn-primary { background-color: #06C755; color: white; }
     .btn-secondary { background-color: #ebedf0; color: #333; }
+    .btn-danger { background-color: #ff4d4f; color: white; } /* 終了ボタン用 */
     .btn:active { opacity: 0.7; }
     .hidden { display: none; }
-    .input-field { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+    .input-field { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; background-color: #fff; }
     textarea.input-field { height: 100px; resize: none; }
     #loading { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
     
@@ -27,7 +28,6 @@
 <body>
   <div class="container">
     <div id="loading">システムを読み込んでいます...</div>
-    
     <div id="app-content" class="hidden"></div>
   </div>
 
