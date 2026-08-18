@@ -3,7 +3,8 @@ const APP_CONFIG = {
   // ▼ 連携キーとURL
   "LIFF_ID": "2011150909-rbXdgDNt", 
   "GAS_URL": "https://script.google.com/macros/s/AKfycbwMfBZIxZFhA8KFYR3JF044xyGi0cJaEwojsCYkviXoUFpL3IVf_XfuT9NYcbs0HgwtQg/exec", 
-  "HP_BOOKING_URL": "https://dummy-secondhouse-booking.com", // 【仮】公式HPの予約ページURL
+  // ▼ 正規の公式HP予約ページURLに修正
+  "HP_BOOKING_URL": "https://www.schsch-secondhouse.com/contact", 
 
   // ▼ 施設一覧マスタ（言語別に設定）
   "facilities": {
