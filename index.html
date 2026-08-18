@@ -17,17 +17,20 @@
     .input-field { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
     textarea.input-field { height: 100px; resize: none; }
     #loading { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
+    
+    /* 言語切替ボタン用のスタイル */
+    .lang-selector { display: flex; justify-content: flex-end; gap: 5px; margin-bottom: 15px; }
+    .lang-btn { padding: 4px 8px; font-size: 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: #fff; color: #333; transition: 0.2s; }
+    .lang-btn.active { background: #06C755; color: #fff; border-color: #06C755; }
   </style>
 </head>
 <body>
   <div class="container">
     <div id="loading">システムを読み込んでいます...</div>
     
-    <!-- ここにJavaScriptで動的にボタンやフォームが生成されます -->
     <div id="app-content" class="hidden"></div>
   </div>
 
-  <!-- LIFF SDK と 独自スクリプトの読み込み -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="config.js"></script>
   <script src="main.js"></script>
