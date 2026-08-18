@@ -3,22 +3,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loading = document.getElementById('loading');
   const appContent = document.getElementById('app-content');
 
-  // 現在の言語設定
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
-  // 翻訳関数
   function t(key) {
     return APP_CONFIG.translations[currentLang][key] || APP_CONFIG.translations['ja'][key] || key;
   }
 
-  // 言語切り替え関数
   function changeLang(lang) {
     currentLang = lang;
     localStorage.setItem('app_lang', lang);
     renderTopMenu();
   }
 
-  // 言語切替セレクターのHTML生成
   function renderLangSelectorHtml() {
     return `
       <div class="lang-selector">
@@ -30,7 +26,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // 言語切替ボタンのイベントバインド
   function bindLangSelectorEvents(reRenderFunc, ...args) {
     document.querySelectorAll('.lang-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -42,16 +37,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // アプリ終了関数
   function closeApp() {
     liff.closeWindow();
   }
 
   try {
-    // LIFFの初期化
     await liff.init({ liffId: APP_CONFIG.LIFF_ID });
 
-    // 未ログイン状態の場合はLINEログインへ誘導
     if (!liff.isLoggedIn()) {
       liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
       return;
@@ -65,9 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     loading.innerText = 'エラーが発生しました: ' + error.message;
   }
 
-  // ==========================================
-  // 【階層①】TOPメニュー
-  // ==========================================
   function renderTopMenu() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -80,11 +69,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
   }
 
-  // ==========================================
-  // 【階層②〜④】宿泊ゲスト向けフロー
-  // ==========================================
-  
-  // 階層③：氏名の入力
   function renderGuestNameForm() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -103,7 +87,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);
   }
 
-  // 階層④：宿泊施設の選択
   function renderGuestFacilitySelect(guestName) {
     let html = `
       ${renderLangSelectorHtml()}
@@ -128,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', renderGuestNameForm);
   }
 
-  // 階層④(メイン)：アクション選択メニュー
   function renderGuestActionMenu(guestName, facilityName) {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -148,7 +130,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-close').addEventListener('click', closeApp);
   }
 
-  // 階層⑤：チェックイン・アウト処理
   function renderCheckInOutAction(guestName, facilityName) {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -174,7 +155,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
   }
 
-  // 階層⑥：ゲスト向け問い合わせ
   function renderGuestContactCategory(guestName, facilityName) {
     let html = `
       ${renderLangSelectorHtml()}
@@ -213,23 +193,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!text) return alert(t('inquiryAlert'));
       
       const messageToChat = `【${categoryName}】\n施設：${facilityName}\nお名前：${guestName} 様\n\n${text}`;
-      if (!confirm("以下の内容をトークルームに送信します。\n\n" + messageToChat)) return;
+      if (!confirm("以下の内容を送信します。\n\n" + messageToChat)) return;
 
       try {
-        await liff.sendMessages([{ type: "text", text: messageToChat }]);
-        alert(t('inquirySuccess'));
+        if (liff.isInClient()) {
+          // スマホの場合はトークルームへ送信
+          await liff.sendMessages([{ type: "text", text: messageToChat }]);
+          alert(t('inquirySuccess'));
+        } else {
+          // PCの場合はGASへ通知（ハイブリッド処理）
+          await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: guestName, message: text });
+          alert("PC環境からのため、システム経由でスタッフへ送信しました。返信をお待ちください。");
+        }
         renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
-        alert('送信に失敗しました。LINEアプリ内から再度お試しください。\n詳細: ' + err.message);
+        alert('送信に失敗しました: ' + err.message);
       }
     });
 
     document.getElementById('btn-back').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
   }
 
-  // ==========================================
-  // 【階層②〜】予約・宿泊でないお客様向けフロー
-  // ==========================================
   function renderNonGuestMenu() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -288,11 +272,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderReturningBookingForm);
 
     document.getElementById('btn-proceed').addEventListener('click', async () => {
-      const year = document.getElementById('stay-year').value;
-      const month = document.getElementById('stay-month').value;
+      const year = document.getElementById('stay-year').value.trim();
+      const month = document.getElementById('stay-month').value.trim();
       const facility = document.getElementById('stay-facility').value;
-      const pastName = document.getElementById('stay-name').value;
-      const coupon = document.getElementById('coupon-code').value;
+      const pastName = document.getElementById('stay-name').value.trim();
+      const coupon = document.getElementById('coupon-code').value.trim();
+
+      // ★ 必須入力チェック処理
+      if (!year || !month || !facility || !pastName) {
+        return alert("年、月、滞在施設、前回ご予約時のお名前は必須入力です。\n(Please fill in all required fields.)");
+      }
 
       await notifyToGAS("push_notify", { 
         category: "returning_booking", 
@@ -323,34 +312,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!name || !text) return alert(t('inquiryAlert'));
       
       const messageToChat = `【${categoryName}】\nお名前：${name} 様\n\n${text}`;
-      if (!confirm("以下の内容をトークルームに送信します。\n\n" + messageToChat)) return;
+      if (!confirm("以下の内容を送信します。\n\n" + messageToChat)) return;
 
       try {
-        await liff.sendMessages([{ type: "text", text: messageToChat }]);
-        alert(t('inquirySuccess'));
+        if (liff.isInClient()) {
+          // スマホの場合
+          await liff.sendMessages([{ type: "text", text: messageToChat }]);
+          alert(t('inquirySuccess'));
+        } else {
+          // PCの場合（ハイブリッド処理）
+          await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: "一般", guestName: name, message: text });
+          alert("PC環境からのため、システム経由でスタッフへ送信しました。返信をお待ちください。");
+        }
         renderNonGuestMenu();
       } catch (err) {
-        alert('送信に失敗しました。LINEアプリ内から再度お試しください。\n詳細: ' + err.message);
+        alert('送信に失敗しました: ' + err.message);
       }
     });
 
     document.getElementById('btn-back').addEventListener('click', renderNonGuestMenu);
   }
 
-  // ==========================================
-  // 【共通】GAS通信用ユーティリティ
-  // ==========================================
-  
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const idToken = liff.getIDToken();
-    
     if (!idToken) {
       alert('認証セッションが切れました。再ログインを行います。');
       liff.logout();
       liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
       return false;
     }
-
     const payload = { idToken, type, facilityName, guestName, action, detail: lang };
     try {
       await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -371,5 +361,4 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error("GAS notify error", e);
     }
   }
-
 });
