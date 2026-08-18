@@ -43,6 +43,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     // LIFFの初期化
     await liff.init({ liffId: APP_CONFIG.LIFF_ID });
+
+    // ▼【新規追加】未ログイン状態（PCや外部ブラウザ等）の場合、LINEのログイン画面へ自動誘導する
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
 
