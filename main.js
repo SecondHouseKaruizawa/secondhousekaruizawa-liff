@@ -36,8 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', (e) => {
         currentLang = e.target.getAttribute('data-lang');
         localStorage.setItem('app_lang', currentLang);
-        // 現在の画面を再描画する
-        if(reRenderFunc) reRenderFunc(...args);
+        if (reRenderFunc) reRenderFunc(...args);
         else renderTopMenu();
       });
     });
@@ -52,9 +51,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // LIFFの初期化
     await liff.init({ liffId: APP_CONFIG.LIFF_ID });
 
+    // 未ログイン状態の場合はLINEログインへ誘導
     if (!liff.isLoggedIn()) {
       liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
       return;
+    }
+
+    // ★【自動リカバリ1】ログイン済みだがメッセージ送信権限（chat_message.write）が未許可の場合、自動で許可ダイアログを要求
+    if (liff.permission) {
+      const permissionStatus = await liff.permission.query("chat_message.write");
+      if (permissionStatus.state !== "granted") {
+        await liff.permission.requestAll();
+      }
     }
 
     loading.classList.add('hidden');
@@ -98,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-next').addEventListener('click', () => {
       const name = document.getElementById('guest-name-input').value.trim();
       if (!name) return alert(t('nameAlert'));
-      renderGuestFacilitySelect(name); // 取得した名前を次の画面へ渡す
+      renderGuestFacilitySelect(name);
     });
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);
   }
@@ -122,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.btn-facility').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const facilityName = e.target.getAttribute('data-name');
-        renderGuestActionMenu(guestName, facilityName); // 名前と施設をアクションメニューへ渡す
+        renderGuestActionMenu(guestName, facilityName);
       });
     });
     document.getElementById('btn-back').addEventListener('click', renderGuestNameForm);
@@ -142,7 +150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
     document.getElementById('btn-survey').addEventListener('click', () => {
-      // 選択中の言語に合わせたURLへ直接遷移
       window.location.href = APP_CONFIG.surveyUrls[currentLang] || APP_CONFIG.surveyUrls['ja'];
     });
     document.getElementById('btn-contact').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
@@ -163,9 +170,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitAction = async (actionText, actionLogText) => {
       if (!confirm(`【${facilityName}】\n${guestName} 様\n「${actionText}」を送信しますか？`)) return;
       
-      await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang);
-      alert(t('sendSuccess'));
-      renderGuestActionMenu(guestName, facilityName); // 完了後はメニューへ戻す
+      const success = await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang);
+      if (success) {
+        alert(t('sendSuccess'));
+        renderGuestActionMenu(guestName, facilityName);
+      }
     };
 
     document.getElementById('btn-in').addEventListener('click', () => submitAction(t('checkInBtn'), '到着・チェックイン(Checked-In)'));
@@ -173,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
   }
 
-  // 階層⑥：ゲスト向け問い合わせ（カテゴリ選択＆送信）
+  // 階層⑥：ゲスト向け問い合わせ
   function renderGuestContactCategory(guestName, facilityName) {
     let html = `
       ${renderLangSelectorHtml()}
@@ -211,16 +220,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
       
-      // 名前と施設情報を結合して送信
       const messageToChat = `【${categoryName}】\n施設：${facilityName}\nお名前：${guestName} 様\n\n${text}`;
       if (!confirm("以下の内容をトークルームに送信します。\n\n" + messageToChat)) return;
 
       try {
         await liff.sendMessages([{ type: "text", text: messageToChat }]);
         alert(t('inquirySuccess'));
-        renderGuestActionMenu(guestName, facilityName); // メニューに戻す
+        renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
-        alert('送信に失敗しました。' + err.message);
+        // ★【自動リカバリ2】送信エラー時に権限不足を検知したら、その場で許可ダイアログを立ち上げる
+        if (err.message && err.message.includes('grant required permissions')) {
+          alert('LINEのメッセージ送信権限の許可が必要です。表示される画面で許可を行ってください。');
+          await liff.permission.requestAll();
+        } else {
+          alert('送信に失敗しました: ' + err.message);
+        }
       }
     });
 
@@ -247,7 +261,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);
   }
 
-  // 予約メニュー
   function renderBookingMenu() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -258,12 +271,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
     bindLangSelectorEvents(renderBookingMenu);
 
-    // リピーター予約処理
     document.getElementById('btn-ret-guest').addEventListener('click', renderReturningBookingForm);
-    
-    // 初回予約処理
     document.getElementById('btn-first-guest').addEventListener('click', async () => {
-      // GASへ初回予約リンクの押下をPush通知リクエスト
       await notifyToGAS("push_notify", { category: "first_time_booking", lang: currentLang });
       window.location.href = APP_CONFIG.HP_BOOKING_URL;
     });
@@ -271,9 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', renderNonGuestMenu);
   }
 
-  // 2回目以降のご予約入力フォーム
   function renderReturningBookingForm() {
-    // 施設リストの生成
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     let optionsHtml = '';
     currentFacilities.forEach(f => { optionsHtml += `<option value="${f.name}">${f.name}</option>`; });
@@ -301,20 +308,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const pastName = document.getElementById('stay-name').value;
       const coupon = document.getElementById('coupon-code').value;
 
-      // GASへリピーター予約の情報をPush通知リクエストとして送信
       await notifyToGAS("push_notify", { 
         category: "returning_booking", 
         year, month, facility, pastName, coupon, lang: currentLang
       });
       
-      // 公式HPへ飛ばす
       window.location.href = APP_CONFIG.HP_BOOKING_URL;
     });
 
     document.getElementById('btn-back').addEventListener('click', renderBookingMenu);
   }
 
-  // 一般の問い合わせ入力フォーム
   function renderNonGuestInquiryForm() {
     const categoryName = t('nonGuestInquiryName');
     appContent.innerHTML = `
@@ -338,9 +342,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await liff.sendMessages([{ type: "text", text: messageToChat }]);
         alert(t('inquirySuccess'));
-        renderNonGuestMenu(); // 完了後はメニューへ戻す
+        renderNonGuestMenu();
       } catch (err) {
-        alert('送信に失敗しました。' + err.message);
+        if (err.message && err.message.includes('grant required permissions')) {
+          alert('LINEのメッセージ送信権限の許可が必要です。表示される画面で許可を行ってください。');
+          await liff.permission.requestAll();
+        } else {
+          alert('送信に失敗しました: ' + err.message);
+        }
       }
     });
 
@@ -351,22 +360,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【共通】GAS通信用ユーティリティ
   // ==========================================
   
-  // 既存のチェックイン送信用
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const idToken = liff.getIDToken();
+    
+    // ★【自動リカバリ3】トークンが空または期限切れの可能性が高い場合は自動で再ログイン
+    if (!idToken) {
+      alert('認証セッションが切れました。再ログインを行います。');
+      liff.logout();
+      liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
+      return false;
+    }
+
     const payload = { idToken, type, facilityName, guestName, action, detail: lang };
     try {
       await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-    } catch(e) { console.error("GAS send error", e); }
+      return true;
+    } catch (e) {
+      console.error("GAS send error", e);
+      return false;
+    }
   }
 
-  // 新規追加：Push通知リクエスト送信用
   async function notifyToGAS(type, dataObj) {
     const idToken = liff.getIDToken();
+    if (!idToken) return;
     const payload = { idToken, type: type, data: dataObj };
     try {
       await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-    } catch(e) { console.error("GAS notify error", e); }
+    } catch (e) {
+      console.error("GAS notify error", e);
+    }
   }
 
 });
