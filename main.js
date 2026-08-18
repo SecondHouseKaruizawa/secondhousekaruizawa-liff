@@ -57,11 +57,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ★【自動リカバリ1】ログイン済みだがメッセージ送信権限（chat_message.write）が未許可の場合、自動で許可ダイアログを要求
+    // ★【自動リカバリ1修正版】権限不足の場合は、安全に一度ログアウトさせて再ログインさせる
     if (liff.permission) {
-      const permissionStatus = await liff.permission.query("chat_message.write");
-      if (permissionStatus.state !== "granted") {
-        await liff.permission.requestAll();
+      try {
+        const permissionStatus = await liff.permission.query("chat_message.write");
+        if (permissionStatus.state !== "granted") {
+          liff.logout();
+          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
+          return;
+        }
+      } catch (e) {
+        console.warn("Permission check skipped", e);
       }
     }
 
@@ -228,10 +234,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert(t('inquirySuccess'));
         renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
-        // ★【自動リカバリ2】送信エラー時に権限不足を検知したら、その場で許可ダイアログを立ち上げる
+        // ★【自動リカバリ2修正版】送信時に権限エラーが出たら安全に再ログインさせる
         if (err.message && err.message.includes('grant required permissions')) {
-          alert('LINEのメッセージ送信権限の許可が必要です。表示される画面で許可を行ってください。');
-          await liff.permission.requestAll();
+          alert('LINEのメッセージ送信権限が必要です。再認証を行います。');
+          liff.logout();
+          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
         } else {
           alert('送信に失敗しました: ' + err.message);
         }
@@ -345,8 +352,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderNonGuestMenu();
       } catch (err) {
         if (err.message && err.message.includes('grant required permissions')) {
-          alert('LINEのメッセージ送信権限の許可が必要です。表示される画面で許可を行ってください。');
-          await liff.permission.requestAll();
+          alert('LINEのメッセージ送信権限が必要です。再認証を行います。');
+          liff.logout();
+          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
         } else {
           alert('送信に失敗しました: ' + err.message);
         }
@@ -363,7 +371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const idToken = liff.getIDToken();
     
-    // ★【自動リカバリ3】トークンが空または期限切れの可能性が高い場合は自動で再ログイン
+    // ★【自動リカバリ3】トークンが空の場合は安全に再ログイン
     if (!idToken) {
       alert('認証セッションが切れました。再ログインを行います。');
       liff.logout();
