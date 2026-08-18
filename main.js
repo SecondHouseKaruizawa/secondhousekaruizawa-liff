@@ -57,8 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ※無限ループを引き起こしていた「liff.permission」のチェックブロックを完全に削除しました
-
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
 
@@ -222,13 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert(t('inquirySuccess'));
         renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
-        if (err.message && err.message.includes('grant required permissions')) {
-          alert('LINEのメッセージ送信権限が必要です。再認証を行います。');
-          liff.logout();
-          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
-        } else {
-          alert('送信に失敗しました: ' + err.message);
-        }
+        alert('送信に失敗しました。LINEアプリ内から再度お試しください。\n詳細: ' + err.message);
       }
     });
 
@@ -338,13 +330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert(t('inquirySuccess'));
         renderNonGuestMenu();
       } catch (err) {
-        if (err.message && err.message.includes('grant required permissions')) {
-          alert('LINEのメッセージ送信権限が必要です。再認証を行います。');
-          liff.logout();
-          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
-        } else {
-          alert('送信に失敗しました: ' + err.message);
-        }
+        alert('送信に失敗しました。LINEアプリ内から再度お試しください。\n詳細: ' + err.message);
       }
     });
 
