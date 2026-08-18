@@ -57,19 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ★【自動リカバリ1修正版】権限不足の場合は、安全に一度ログアウトさせて再ログインさせる
-    if (liff.permission) {
-      try {
-        const permissionStatus = await liff.permission.query("chat_message.write");
-        if (permissionStatus.state !== "granted") {
-          liff.logout();
-          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
-          return;
-        }
-      } catch (e) {
-        console.warn("Permission check skipped", e);
-      }
-    }
+    // ※無限ループを引き起こしていた「liff.permission」のチェックブロックを完全に削除しました
 
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -234,7 +222,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert(t('inquirySuccess'));
         renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
-        // ★【自動リカバリ2修正版】送信時に権限エラーが出たら安全に再ログインさせる
         if (err.message && err.message.includes('grant required permissions')) {
           alert('LINEのメッセージ送信権限が必要です。再認証を行います。');
           liff.logout();
@@ -371,7 +358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const idToken = liff.getIDToken();
     
-    // ★【自動リカバリ3】トークンが空の場合は安全に再ログイン
     if (!idToken) {
       alert('認証セッションが切れました。再ログインを行います。');
       liff.logout();
