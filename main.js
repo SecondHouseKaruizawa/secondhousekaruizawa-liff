@@ -44,9 +44,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // LIFFの初期化
     await liff.init({ liffId: APP_CONFIG.LIFF_ID });
 
-    // ▼【新規追加】未ログイン状態（PCや外部ブラウザ等）の場合、LINEのログイン画面へ自動誘導する
+    // 未ログイン状態の場合、メッセージ送信権限を明示してログインへ誘導
     if (!liff.isLoggedIn()) {
-      liff.login();
+      liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
       return;
     }
 
