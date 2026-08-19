@@ -33,7 +33,7 @@ const APP_CONFIG = {
     ]
   },
 
-  // ▼ 道案内（Google Map）用URLマスタ ★実際のURLを反映
+  // ▼ 道案内（Google Map）用URLマスタ
   "mapUrls": {
     "sc": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2%20%E8%B2%B8%E5%88%A5%E8%88%98%20Second%20House%20sch-sch&waypoints=36.446297%2C138.572883%7C36.455880%2C138.568743%7C36.463130%2C138.556438&dir_action=navigate",
     "Hp": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20%E3%83%9B%E3%83%83%E3%83%9D%E3%83%83%E3%82%BF&waypoints=36.433659%2C138.572737%7C36.446235%2C138.572869&dir_action=navigate",
@@ -109,6 +109,7 @@ const APP_CONFIG = {
       "duringStay": "滞在中メニュー<br><small>(チェックイン・お問い合わせ等)</small>",
       "routeAccess": "施設までの道案内",
       "locationWarning": "※端末の位置情報をONにしたうえでご利用ください。",
+      // ★修正：日本語は接頭辞なし、接尾辞あり
       "accessPrefix": "",
       "accessSuffix": "へのアクセス"
     },
@@ -163,6 +164,7 @@ const APP_CONFIG = {
       "duringStay": "During your stay<br><small>(Check-in / Contact etc.)</small>",
       "routeAccess": "Route Access",
       "locationWarning": "*Please turn on location services before use.",
+      // ★修正：英語は接頭辞あり(スペース付き)、接尾辞なし
       "accessPrefix": "To ",
       "accessSuffix": ""
     },
@@ -217,7 +219,8 @@ const APP_CONFIG = {
       "duringStay": "住宿期間選單<br><small>(入住登記・諮詢等)</small>",
       "routeAccess": "前往設施的路線導航",
       "locationWarning": "※請在開啟裝置定位服務後使用。",
-      "accessPrefix": "前往 ",
+      // ★修正：繁体字(台湾)は接頭辞あり、接尾辞なし
+      "accessPrefix": "前往",
       "accessSuffix": ""
     },
     "zh-CN": {
@@ -271,7 +274,8 @@ const APP_CONFIG = {
       "duringStay": "住宿期间菜单<br><small>(入住登记・咨询等)</small>",
       "routeAccess": "前往设施的路线导航",
       "locationWarning": "※请在开启设备定位服务后使用。",
-      "accessPrefix": "前往 ",
+      // ★修正：簡体字(大陸)は接頭辞あり、接尾辞なし
+      "accessPrefix": "前往",
       "accessSuffix": ""
     }
   }

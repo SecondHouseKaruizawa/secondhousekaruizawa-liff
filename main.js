@@ -5,8 +5,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
+  // ★ 修正箇所：空文字("")を正しく処理できるよう、翻訳取得ロジックを厳格化
   function t(key) {
-    return APP_CONFIG.translations[currentLang][key] || APP_CONFIG.translations['ja'][key] || key;
+    let val = APP_CONFIG.translations[currentLang][key];
+    if (val !== undefined) return val;
+    val = APP_CONFIG.translations['ja'][key];
+    if (val !== undefined) return val;
+    return key;
   }
 
   function changeLang(lang) {
@@ -69,7 +74,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
     bindLangSelectorEvents(renderTopMenu);
     
-    // ゲスト向けメニューの遷移先を「分岐（階層②）」に
     document.getElementById('btn-guest').addEventListener('click', renderGuestTopMenu);
     document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
   }
@@ -104,8 +108,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      const prefix = t('accessPrefix') || '';
-      const suffix = t('accessSuffix') || '';
+      const prefix = t('accessPrefix'); // デフォルト引数削除（関数内で処理）
+      const suffix = t('accessSuffix'); 
       const btnText = `${prefix}${facility.name}${suffix}`;
       html += `<button class="btn btn-primary btn-map" data-id="${facility.id}">${btnText}</button>`;
     });
@@ -443,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【共通】GAS通信用ユーティリティ（影響なし）
+  // 【共通】GAS通信用ユーティリティ
   // ==========================================
   
   async function sendToGAS(type, facilityName, guestName, action, lang) {
