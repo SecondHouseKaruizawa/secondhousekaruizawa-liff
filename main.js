@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
-  // ★ 修正箇所：空文字("")を正しく処理できるよう、翻訳取得ロジックを厳格化
   function t(key) {
     let val = APP_CONFIG.translations[currentLang][key];
     if (val !== undefined) return val;
@@ -108,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      const prefix = t('accessPrefix'); // デフォルト引数削除（関数内で処理）
+      const prefix = t('accessPrefix');
       const suffix = t('accessSuffix'); 
       const btnText = `${prefix}${facility.name}${suffix}`;
       html += `<button class="btn btn-primary btn-map" data-id="${facility.id}">${btnText}</button>`;
@@ -137,13 +136,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層③〜】既存の宿泊ゲスト向けフロー（影響なし）
+  // 【階層③〜】既存の宿泊ゲスト向けフロー
   // ==========================================
   function renderGuestNameForm() {
+    // ★ 追加箇所1：ローカルストレージから前回入力した名前を取得（なければ空文字）
+    const savedName = localStorage.getItem('guest_name') || '';
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('namePrompt')}</h2>
-      <input type="text" id="guest-name-input" class="input-field" placeholder="${t('namePlaceholder')}" required>
+      <!-- ★ 追加箇所2：valueプロパティに取得した名前を初期値としてセット -->
+      <input type="text" id="guest-name-input" class="input-field" placeholder="${t('namePlaceholder')}" value="${savedName}" required>
       <button class="btn btn-primary" id="btn-next">${t('next')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
@@ -152,6 +155,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-next').addEventListener('click', () => {
       const name = document.getElementById('guest-name-input').value.trim();
       if (!name) return alert(t('nameAlert'));
+      
+      // ★ 追加箇所3：入力・編集された名前をローカルストレージに保存
+      localStorage.setItem('guest_name', name);
+      
       renderGuestFacilitySelect(name);
     });
     
@@ -301,7 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層②〜】予約・宿泊でないお客様向けフロー（影響なし）
+  // 【階層②〜】予約・宿泊でないお客様向けフロー
   // ==========================================
   function renderNonGuestMenu() {
     appContent.innerHTML = `
