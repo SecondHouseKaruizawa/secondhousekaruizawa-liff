@@ -3,10 +3,9 @@ const APP_CONFIG = {
   // ▼ 連携キーとURL
   "LIFF_ID": "2011150909-rbXdgDNt", 
   "GAS_URL": "https://script.google.com/macros/s/AKfycbwMfBZIxZFhA8KFYR3JF044xyGi0cJaEwojsCYkviXoUFpL3IVf_XfuT9NYcbs0HgwtQg/exec", 
-  // ▼ 正規の公式HP予約ページURLに修正
   "HP_BOOKING_URL": "https://www.schsch-secondhouse.com/contact", 
 
-  // ▼ 施設一覧マスタ（言語別に設定）
+  // ▼ 施設一覧マスタ
   "facilities": {
     "ja": [
       { "id": "sc", "name": "sch-sch" },
@@ -92,7 +91,13 @@ const APP_CONFIG = {
       "stayMonth": "月 (例: 10)",
       "pastName": "前回ご予約時のお名前",
       "couponCode": "クーポンコード等の入力 (任意)",
-      "proceedHp": "公式HPの予約ページへ"
+      "proceedHp": "公式HPの予約ページへ",
+      // ▼ ここから下が新規追加のポップアップ用翻訳
+      "confirmSend": "以下の内容を送信しますか？",
+      "pcFallbackSuccess": "PC環境からのため、システム経由でスタッフへ送信しました。返信をお待ちください。",
+      "sendFail": "送信に失敗しました: ",
+      "validationAlert": "年、月、滞在施設、前回ご予約時のお名前は必須入力です。",
+      "sessionExpired": "認証セッションが切れました。再ログインを行います。"
     },
     "en": {
       "loading": "Loading system...",
@@ -135,7 +140,13 @@ const APP_CONFIG = {
       "stayMonth": "Month (e.g. 10)",
       "pastName": "Name used for previous booking",
       "couponCode": "Any code if available (Optional)",
-      "proceedHp": "Proceed to Official Booking Page"
+      "proceedHp": "Proceed to Official Booking Page",
+      // ▼ New Popup Translations
+      "confirmSend": "Are you sure you want to send the following details?",
+      "pcFallbackSuccess": "Sent via system for PC environment. Please wait for a reply.",
+      "sendFail": "Failed to send: ",
+      "validationAlert": "Year, Month, Facility, and Previous Name are required fields.",
+      "sessionExpired": "Session expired. Please log in again."
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -178,7 +189,13 @@ const APP_CONFIG = {
       "stayMonth": "月 (例: 10)",
       "pastName": "上次預約姓名",
       "couponCode": "優惠碼等 (選填)",
-      "proceedHp": "前往官方網站預約"
+      "proceedHp": "前往官方網站預約",
+      // ▼ New Popup Translations
+      "confirmSend": "是否確定送出以下內容？",
+      "pcFallbackSuccess": "因使用電腦環境，已透過系統發送給工作人員。請稍候回覆。",
+      "sendFail": "發送失敗: ",
+      "validationAlert": "年、月、入住設施、上次預約姓名為必填項目。",
+      "sessionExpired": "認證已過期，將重新登入。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -221,7 +238,13 @@ const APP_CONFIG = {
       "stayMonth": "月 (例: 10)",
       "pastName": "上次预约姓名",
       "couponCode": "优惠码等 (选填)",
-      "proceedHp": "前往官方网站预约"
+      "proceedHp": "前往官方网站预约",
+      // ▼ New Popup Translations
+      "confirmSend": "是否确定发送以下内容？",
+      "pcFallbackSuccess": "因使用电脑环境，已通过系统发送给工作人员。请稍候回复。",
+      "sendFail": "发送失败: ",
+      "validationAlert": "年、月、入住设施、上次预约姓名为必填项目。",
+      "sessionExpired": "认证已过期，将重新登录。"
     }
   }
 };
