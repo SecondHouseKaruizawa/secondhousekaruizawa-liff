@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderTopMenu();
   } catch (error) {
-    loading.innerText = 'Error: ' + error.message;
+    loading.innerText = 'エラーが発生しました: ' + error.message;
   }
 
   function renderTopMenu() {
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderGuestFacilitySelect(guestName) {
     let html = `
       ${renderLangSelectorHtml()}
-      <h2>${guestName}<br>${t('selectFacility')}</h2>
+      <h2>${guestName} 様<br>${t('selectFacility')}</h2>
     `;
     
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderGuestActionMenu(guestName, facilityName) {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>[ ${facilityName} ]<br>${guestName}<br>----<br>${t('selectGuestMenu')}</h2>
+      <h2>【${facilityName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCheckInOutAction(guestName, facilityName) {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>[ ${facilityName} ]<br>${guestName}<br>${t('selectAction')}</h2>
+      <h2>【${facilityName}】<br>${guestName} 様<br>${t('selectAction')}</h2>
       <button class="btn btn-primary" id="btn-in">${t('checkInBtn')}</button>
       <button class="btn btn-primary" id="btn-out">${t('checkOutBtn')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
@@ -141,14 +141,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
     
     const submitAction = async (actionText, actionLogText) => {
-      // ▼ 多言語対応の確認ポップアップ
-      const confirmMsg = `[ ${facilityName} ]\n${guestName}\n\n[ ${actionText} ]\n\n${t('confirmSend')}`;
+      const confirmMsg = `【${facilityName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
       if (!confirm(confirmMsg)) return;
       
+      // ★ GASの処理完了を待ち、エラーならブロックする制御
+      loading.innerText = t('loading');
+      loading.classList.remove('hidden');
+
       const success = await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang);
+      
+      loading.classList.add('hidden');
       if (success) {
         alert(t('sendSuccess'));
         renderGuestActionMenu(guestName, facilityName);
+      } else {
+        alert(t('sendFail') + "(Auth Error)");
       }
     };
 
@@ -194,8 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
       
-      // ▼ 多言語対応の確認ポップアップ
-      const messageToChat = `【${categoryName}】\n施設：${facilityName}\nお名前：${guestName}\n\n${text}`;
+      const messageToChat = `【${categoryName}】\n施設：${facilityName}\nお名前：${guestName} 様\n\n${text}`;
       const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
       if (!confirm(confirmMsg)) return;
 
@@ -204,8 +210,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           await liff.sendMessages([{ type: "text", text: messageToChat }]);
           alert(t('inquirySuccess'));
         } else {
-          await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: guestName, message: text });
-          alert(t('pcFallbackSuccess'));
+          loading.innerText = t('loading');
+          loading.classList.remove('hidden');
+          const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: guestName, message: text });
+          loading.classList.add('hidden');
+          
+          if (success) {
+            alert(t('pcFallbackSuccess'));
+          } else {
+            return alert(t('sendFail') + "(Auth Error)");
+          }
         }
         renderGuestActionMenu(guestName, facilityName);
       } catch (err) {
@@ -245,8 +259,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-ret-guest').addEventListener('click', renderReturningBookingForm);
     document.getElementById('btn-first-guest').addEventListener('click', async () => {
-      await notifyToGAS("push_notify", { category: "first_time_booking", lang: currentLang });
-      window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      
+      // ★ 新規予約時のGAS判定ブロック
+      loading.innerText = t('loading');
+      loading.classList.remove('hidden');
+      
+      const success = await notifyToGAS("push_notify", { category: "first_time_booking", lang: currentLang });
+      
+      loading.classList.add('hidden');
+      if (success) {
+        window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      } else {
+        alert(t('sendFail') + "(Auth Error)");
+      }
     });
 
     document.getElementById('btn-back').addEventListener('click', renderNonGuestMenu);
@@ -281,16 +306,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       const coupon = document.getElementById('coupon-code').value.trim();
 
       if (!year || !month || !facility || !pastName) {
-        // ▼ 多言語対応の必須入力アラート
         return alert(t('validationAlert'));
       }
 
-      await notifyToGAS("push_notify", { 
+      // ★ リピーター予約時のGAS判定ブロック
+      loading.innerText = t('loading');
+      loading.classList.remove('hidden');
+
+      const success = await notifyToGAS("push_notify", { 
         category: "returning_booking", 
         year, month, facility, pastName, coupon, lang: currentLang
       });
       
-      window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      loading.classList.add('hidden');
+      if (success) {
+        window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      } else {
+        alert(t('sendFail') + "(Auth Error)");
+      }
     });
 
     document.getElementById('btn-back').addEventListener('click', renderBookingMenu);
@@ -313,8 +346,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!name || !text) return alert(t('inquiryAlert'));
       
-      // ▼ 多言語対応の確認ポップアップ
-      const messageToChat = `【${categoryName}】\nお名前：${name}\n\n${text}`;
+      const messageToChat = `【${categoryName}】\nお名前：${name} 様\n\n${text}`;
       const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
       if (!confirm(confirmMsg)) return;
 
@@ -323,8 +355,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           await liff.sendMessages([{ type: "text", text: messageToChat }]);
           alert(t('inquirySuccess'));
         } else {
-          await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: "一般", guestName: name, message: text });
-          alert(t('pcFallbackSuccess'));
+          loading.innerText = t('loading');
+          loading.classList.remove('hidden');
+          const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: "一般", guestName: name, message: text });
+          loading.classList.add('hidden');
+
+          if (success) {
+            alert(t('pcFallbackSuccess'));
+          } else {
+            return alert(t('sendFail') + "(Auth Error)");
+          }
         }
         renderNonGuestMenu();
       } catch (err) {
@@ -335,6 +375,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', renderNonGuestMenu);
   }
 
+  // ==========================================
+  // 【共通】GAS通信用ユーティリティ（レスポンス監視対応）
+  // ==========================================
+  
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const idToken = liff.getIDToken();
     if (!idToken) {
@@ -345,7 +389,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const payload = { idToken, type, facilityName, guestName, action, detail: lang };
     try {
-      await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const text = await response.text();
+      // GAS側から "Error" が返却された場合は false を返す
+      if (text === "Error") return false;
       return true;
     } catch (e) {
       console.error("GAS send error", e);
@@ -355,12 +402,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function notifyToGAS(type, dataObj) {
     const idToken = liff.getIDToken();
-    if (!idToken) return;
+    if (!idToken) return false;
     const payload = { idToken, type: type, data: dataObj };
     try {
-      await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const text = await response.text();
+      // GAS側から "Error" が返却された場合は false を返す
+      if (text === "Error") return false;
+      return true;
     } catch (e) {
       console.error("GAS notify error", e);
+      return false;
     }
   }
 });
