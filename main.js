@@ -57,6 +57,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     loading.innerText = 'エラーが発生しました: ' + error.message;
   }
 
+  // ==========================================
+  // 【階層①】TOPメニュー
+  // ==========================================
   function renderTopMenu() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -65,10 +68,73 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button class="btn btn-secondary" id="btn-nonguest">${t('nonGuest')}<br><small>${t('nonGuestSub')}</small></button>
     `;
     bindLangSelectorEvents(renderTopMenu);
-    document.getElementById('btn-guest').addEventListener('click', renderGuestNameForm);
+    
+    // ゲスト向けメニューの遷移先を「分岐（階層②）」に
+    document.getElementById('btn-guest').addEventListener('click', renderGuestTopMenu);
     document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
   }
 
+  // ==========================================
+  // 【階層②】宿泊ゲスト向け分岐メニュー
+  // ==========================================
+  function renderGuestTopMenu() {
+    appContent.innerHTML = `
+      ${renderLangSelectorHtml()}
+      <h2>${t('guestTopMenuPrompt')}</h2>
+      <button class="btn btn-primary" id="btn-during-stay">${t('duringStay')}</button>
+      <button class="btn btn-primary" id="btn-route-access">${t('routeAccess')}</button>
+      <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
+    `;
+    bindLangSelectorEvents(renderGuestTopMenu);
+
+    document.getElementById('btn-during-stay').addEventListener('click', renderGuestNameForm);
+    document.getElementById('btn-route-access').addEventListener('click', renderRouteAccessMenu);
+    document.getElementById('btn-back').addEventListener('click', renderTopMenu);
+  }
+
+  // ==========================================
+  // 【階層③】施設までの道案内メニュー
+  // ==========================================
+  function renderRouteAccessMenu() {
+    let html = `
+      ${renderLangSelectorHtml()}
+      <h2>${t('routeAccess')}</h2>
+      <p style="font-size: 13px; color: #ff4d4f; text-align: center; margin-bottom: 15px; font-weight: bold;">${t('locationWarning')}</p>
+    `;
+    
+    const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
+    currentFacilities.forEach(facility => {
+      const prefix = t('accessPrefix') || '';
+      const suffix = t('accessSuffix') || '';
+      const btnText = `${prefix}${facility.name}${suffix}`;
+      html += `<button class="btn btn-primary btn-map" data-id="${facility.id}">${btnText}</button>`;
+    });
+    
+    html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
+    
+    appContent.innerHTML = html;
+    bindLangSelectorEvents(renderRouteAccessMenu);
+
+    document.querySelectorAll('.btn-map').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const facilityId = e.target.getAttribute('data-id');
+        const mapUrl = APP_CONFIG.mapUrls[facilityId];
+        if(mapUrl) {
+          if (liff.isInClient()) {
+            liff.openWindow({ url: mapUrl, external: true });
+          } else {
+            window.open(mapUrl, '_blank');
+          }
+        }
+      });
+    });
+    
+    document.getElementById('btn-back').addEventListener('click', renderGuestTopMenu);
+  }
+
+  // ==========================================
+  // 【階層③〜】既存の宿泊ゲスト向けフロー（影響なし）
+  // ==========================================
   function renderGuestNameForm() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -84,7 +150,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!name) return alert(t('nameAlert'));
       renderGuestFacilitySelect(name);
     });
-    document.getElementById('btn-back').addEventListener('click', renderTopMenu);
+    
+    document.getElementById('btn-back').addEventListener('click', renderGuestTopMenu);
   }
 
   function renderGuestFacilitySelect(guestName) {
@@ -144,7 +211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const confirmMsg = `【${facilityName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
       if (!confirm(confirmMsg)) return;
       
-      // ★ GASの処理完了を待ち、エラーならブロックする制御
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
@@ -230,6 +296,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
   }
 
+  // ==========================================
+  // 【階層②〜】予約・宿泊でないお客様向けフロー（影響なし）
+  // ==========================================
   function renderNonGuestMenu() {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -260,7 +329,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-ret-guest').addEventListener('click', renderReturningBookingForm);
     document.getElementById('btn-first-guest').addEventListener('click', async () => {
       
-      // ★ 新規予約時のGAS判定ブロック
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
       
@@ -309,7 +377,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return alert(t('validationAlert'));
       }
 
-      // ★ リピーター予約時のGAS判定ブロック
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
@@ -376,7 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【共通】GAS通信用ユーティリティ（レスポンス監視対応）
+  // 【共通】GAS通信用ユーティリティ（影響なし）
   // ==========================================
   
   async function sendToGAS(type, facilityName, guestName, action, lang) {
@@ -391,7 +458,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
       const text = await response.text();
-      // GAS側から "Error" が返却された場合は false を返す
       if (text === "Error") return false;
       return true;
     } catch (e) {
@@ -407,7 +473,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
       const text = await response.text();
-      // GAS側から "Error" が返却された場合は false を返す
       if (text === "Error") return false;
       return true;
     } catch (e) {

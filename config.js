@@ -33,6 +33,14 @@ const APP_CONFIG = {
     ]
   },
 
+  // ▼ 道案内（Google Map）用URLマスタ ★実際のURLを反映
+  "mapUrls": {
+    "sc": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2%20%E8%B2%B8%E5%88%A5%E8%88%98%20Second%20House%20sch-sch&waypoints=36.446297%2C138.572883%7C36.455880%2C138.568743%7C36.463130%2C138.556438&dir_action=navigate",
+    "Hp": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20%E3%83%9B%E3%83%83%E3%83%9D%E3%83%83%E3%82%BF&waypoints=36.433659%2C138.572737%7C36.446235%2C138.572869&dir_action=navigate",
+    "ku": "https://www.google.com/maps/dir/?api=1&destination=Second%20House%20kukka&waypoints=36.426473%2C138.571570%7C36.435608%2C138.574219&dir_action=navigate",
+    "LU": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20LUONTO&waypoints=via%3A36.443333%2C138.578694&dir_action=navigate"
+  },
+
   // ▼ 言語別アンケートURLマスタ
   "surveyUrls": {
     "ja": "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAO__dEP6D5UNFlQN0QyQlQxOE5QOVNETkpXM0dYMjdOVi4u",
@@ -92,12 +100,17 @@ const APP_CONFIG = {
       "pastName": "前回ご予約時のお名前",
       "couponCode": "クーポンコード等の入力 (任意)",
       "proceedHp": "公式HPの予約ページへ",
-      // ▼ ここから下が新規追加のポップアップ用翻訳
       "confirmSend": "以下の内容を送信しますか？",
       "pcFallbackSuccess": "PC環境からのため、システム経由でスタッフへ送信しました。返信をお待ちください。",
       "sendFail": "送信に失敗しました: ",
       "validationAlert": "年、月、滞在施設、前回ご予約時のお名前は必須入力です。",
-      "sessionExpired": "認証セッションが切れました。再ログインを行います。"
+      "sessionExpired": "認証セッションが切れました。再ログインを行います。",
+      "guestTopMenuPrompt": "ご希望のメニューをご選択ください",
+      "duringStay": "滞在中メニュー<br><small>(チェックイン・お問い合わせ等)</small>",
+      "routeAccess": "施設までの道案内",
+      "locationWarning": "※端末の位置情報をONにしたうえでご利用ください。",
+      "accessPrefix": "",
+      "accessSuffix": "へのアクセス"
     },
     "en": {
       "loading": "Loading system...",
@@ -141,12 +154,17 @@ const APP_CONFIG = {
       "pastName": "Name used for previous booking",
       "couponCode": "Any code if available (Optional)",
       "proceedHp": "Proceed to Official Booking Page",
-      // ▼ New Popup Translations
       "confirmSend": "Are you sure you want to send the following details?",
       "pcFallbackSuccess": "Sent via system for PC environment. Please wait for a reply.",
       "sendFail": "Failed to send: ",
       "validationAlert": "Year, Month, Facility, and Previous Name are required fields.",
-      "sessionExpired": "Session expired. Please log in again."
+      "sessionExpired": "Session expired. Please log in again.",
+      "guestTopMenuPrompt": "Please select a menu",
+      "duringStay": "During your stay<br><small>(Check-in / Contact etc.)</small>",
+      "routeAccess": "Route Access",
+      "locationWarning": "*Please turn on location services before use.",
+      "accessPrefix": "To ",
+      "accessSuffix": ""
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -190,12 +208,17 @@ const APP_CONFIG = {
       "pastName": "上次預約姓名",
       "couponCode": "優惠碼等 (選填)",
       "proceedHp": "前往官方網站預約",
-      // ▼ New Popup Translations
       "confirmSend": "是否確定送出以下內容？",
       "pcFallbackSuccess": "因使用電腦環境，已透過系統發送給工作人員。請稍候回覆。",
       "sendFail": "發送失敗: ",
       "validationAlert": "年、月、入住設施、上次預約姓名為必填項目。",
-      "sessionExpired": "認證已過期，將重新登入。"
+      "sessionExpired": "認證已過期，將重新登入。",
+      "guestTopMenuPrompt": "請選擇選單",
+      "duringStay": "住宿期間選單<br><small>(入住登記・諮詢等)</small>",
+      "routeAccess": "前往設施的路線導航",
+      "locationWarning": "※請在開啟裝置定位服務後使用。",
+      "accessPrefix": "前往 ",
+      "accessSuffix": ""
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -239,12 +262,17 @@ const APP_CONFIG = {
       "pastName": "上次预约姓名",
       "couponCode": "优惠码等 (选填)",
       "proceedHp": "前往官方网站预约",
-      // ▼ New Popup Translations
       "confirmSend": "是否确定发送以下内容？",
       "pcFallbackSuccess": "因使用电脑环境，已通过系统发送给工作人员。请稍候回复。",
       "sendFail": "发送失败: ",
       "validationAlert": "年、月、入住设施、上次预约姓名为必填项目。",
-      "sessionExpired": "认证已过期，将重新登录。"
+      "sessionExpired": "认证已过期，将重新登录。",
+      "guestTopMenuPrompt": "请选择菜单",
+      "duringStay": "住宿期间菜单<br><small>(入住登记・咨询等)</small>",
+      "routeAccess": "前往设施的路线导航",
+      "locationWarning": "※请在开启设备定位服务后使用。",
+      "accessPrefix": "前往 ",
+      "accessSuffix": ""
     }
   }
 };
