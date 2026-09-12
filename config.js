@@ -38,7 +38,6 @@ const APP_CONFIG = {
     "sc": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2%20%E8%B2%B8%E5%88%A5%E8%88%98%20Second%20House%20sch-sch&waypoints=36.446297%2C138.572883%7C36.455880%2C138.568743%7C36.463130%2C138.556438&dir_action=navigate",
     "Hp": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20%E3%83%9B%E3%83%83%E3%83%9D%E3%83%83%E3%82%BF&waypoints=36.433659%2C138.572737%7C36.446235%2C138.572869&dir_action=navigate",
     "ku": "https://www.google.com/maps/dir/?api=1&destination=Second%20House%20kukka&waypoints=36.426473%2C138.571570%7C36.435608%2C138.574219&dir_action=navigate",
-    // ★修正箇所：LUONTOのURLを修正
     "LU": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20LUONTO&waypoints=36.443333%2C138.578694&dir_action=navigate"
   },
 
@@ -111,7 +110,14 @@ const APP_CONFIG = {
       "routeAccess": "施設までの道案内",
       "locationWarning": "※端末の位置情報をONにしたうえでご利用ください。",
       "accessPrefix": "",
-      "accessSuffix": "へのアクセス"
+      "accessSuffix": "へのアクセス",
+      // ★新規追加: kukka, LUONTO用チェックインメッセージ
+      "ci_msg_staff_contact": "宿泊施設のご案内について、このあと当LINE上にてスタッフから連絡させていただきます。",
+      "ci_msg_wifi": "お手数ですが、ご宿泊の施設が提供するWiFiへ接続してお待ちください。",
+      "ci_msg_contact_method": "スタッフの対応状況により、電話もしくはメッセージにてご連絡差し上げます。",
+      // ★新規追加: sch-sch, ホッポッタ用チェックインメッセージ
+      "ci_msg_welcome": "ようこそ、{facility}へ！{name}様のチェックイン処理を受け付けました。",
+      "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、当LINEもしくは電話にてお気軽にご連絡ください。"
     },
     "en": {
       "loading": "Loading system...",
@@ -165,7 +171,12 @@ const APP_CONFIG = {
       "routeAccess": "Route Access",
       "locationWarning": "*Please turn on location services before use.",
       "accessPrefix": "To ",
-      "accessSuffix": ""
+      "accessSuffix": "",
+      "ci_msg_staff_contact": "Our staff will contact you shortly via this LINE regarding facility instructions.",
+      "ci_msg_wifi": "Please connect to the facility's WiFi and wait.",
+      "ci_msg_contact_method": "Depending on our staff's availability, we will contact you by phone or message.",
+      "ci_msg_welcome": "Welcome to {facility}! We have received the check-in request for {name}.",
+      "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us via this LINE or by phone."
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -219,7 +230,12 @@ const APP_CONFIG = {
       "routeAccess": "前往設施的路線導航",
       "locationWarning": "※請在開啟裝置定位服務後使用。",
       "accessPrefix": "前往",
-      "accessSuffix": ""
+      "accessSuffix": "",
+      "ci_msg_staff_contact": "關於住宿設施的導覽，稍後我們的工作人員將透過此LINE與您聯繫。",
+      "ci_msg_wifi": "麻煩您先連線至設施提供的WiFi並稍候。",
+      "ci_msg_contact_method": "視工作人員的服務狀況，我們將透過電話或訊息與您聯繫。",
+      "ci_msg_welcome": "歡迎來到 {facility}！我們已收到 {name} 貴賓的入住辦理。",
+      "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時透過此LINE或電話與我們聯繫。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -273,7 +289,12 @@ const APP_CONFIG = {
       "routeAccess": "前往设施的路线导航",
       "locationWarning": "※请在开启设备定位服务后使用。",
       "accessPrefix": "前往",
-      "accessSuffix": ""
+      "accessSuffix": "",
+      "ci_msg_staff_contact": "关于住宿设施的向导，稍后我们的工作人员将通过此LINE与您联系。",
+      "ci_msg_wifi": "麻烦您先连接至设施提供的WiFi并稍候。",
+      "ci_msg_contact_method": "视工作人员的服务状况，我们将通过电话或消息与您联系。",
+      "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
+      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时通过此LINE或电话与我们联系。"
     }
   }
 };
