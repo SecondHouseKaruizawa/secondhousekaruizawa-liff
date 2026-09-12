@@ -139,13 +139,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層③〜】既存の宿泊ゲスト向けフロー
   // ==========================================
   function renderGuestNameForm() {
-    // ★ 追加箇所1：ローカルストレージから前回入力した名前を取得（なければ空文字）
     const savedName = localStorage.getItem('guest_name') || '';
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('namePrompt')}</h2>
-      <!-- ★ 追加箇所2：valueプロパティに取得した名前を初期値としてセット -->
       <input type="text" id="guest-name-input" class="input-field" placeholder="${t('namePlaceholder')}" value="${savedName}" required>
       <button class="btn btn-primary" id="btn-next">${t('next')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
@@ -156,7 +154,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const name = document.getElementById('guest-name-input').value.trim();
       if (!name) return alert(t('nameAlert'));
       
-      // ★ 追加箇所3：入力・編集された名前をローカルストレージに保存
       localStorage.setItem('guest_name', name);
       
       renderGuestFacilitySelect(name);
@@ -229,7 +226,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       loading.classList.add('hidden');
       if (success) {
-        alert(t('sendSuccess'));
+        
+        // ★修正箇所: チェックイン完了時のメッセージ出し分け
+        if (actionLogText === '到着・チェックイン(Checked-In)') {
+          const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
+          
+          if (schSchHoppotta.includes(facilityName)) {
+            // sch-sch / ホッポッタ の場合
+            let msgWelcome = t('ci_msg_welcome');
+            // {facility} と {name} を実際の値に置換
+            msgWelcome = msgWelcome.replace('{facility}', facilityName).replace('{name}', guestName);
+            
+            const msgSupport = t('ci_msg_support');
+            alert(`${msgWelcome}\n\n${msgSupport}`);
+          } else {
+            // kukka / LUONTO の場合
+            alert(`${t('ci_msg_staff_contact')}\n\n${t('ci_msg_wifi')}\n\n${t('ci_msg_contact_method')}`);
+          }
+        } else {
+          // チェックアウト等の場合は従来通り
+          alert(t('sendSuccess'));
+        }
+
         renderGuestActionMenu(guestName, facilityName);
       } else {
         alert(t('sendFail') + "(Auth Error)");
