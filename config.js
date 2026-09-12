@@ -92,7 +92,7 @@ const APP_CONFIG = {
       "inquiryAlert": "お名前と内容を入力してください",
       "nonGuestInquiryName": "一般のお問い合わせ(Inquiry)",
       "cat_equip": "施設・備品について",
-      "cat_stay": "滞教について",
+      "cat_stay": "滞在について",
       "cat_others": "その他",
       "lastStayDetail": "前回ご滞在時期の確認",
       "stayYear": "年 (例: 2023)",
