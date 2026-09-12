@@ -13,6 +13,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     return key;
   }
 
+  // ★新規追加: 変数として保持している施設名を、現在の選択言語に合わせて正しく翻訳する機能
+  function getLocalizedFacilityName(name) {
+    let facId = null;
+    for (const lang in APP_CONFIG.facilities) {
+      const fac = APP_CONFIG.facilities[lang].find(f => f.name === name);
+      if (fac) {
+        facId = fac.id;
+        break;
+      }
+    }
+    if (facId) {
+      const localizedFac = (APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja']).find(f => f.id === facId);
+      if (localizedFac) return localizedFac.name;
+    }
+    return name;
+  }
+
   function changeLang(lang) {
     currentLang = lang;
     localStorage.setItem('app_lang', lang);
@@ -187,9 +204,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestActionMenu(guestName, facilityName) {
+    // ★修正箇所：現在選択されている言語の正しい施設名に自動変換して表示
+    const locFacName = getLocalizedFacilityName(facilityName);
+    
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${facilityName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
+      <h2>【${locFacName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
@@ -206,9 +226,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderCheckInOutAction(guestName, facilityName) {
+    const locFacName = getLocalizedFacilityName(facilityName);
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${facilityName}】<br>${guestName} 様<br>${t('selectAction')}</h2>
+      <h2>【${locFacName}】<br>${guestName} 様<br>${t('selectAction')}</h2>
       <button class="btn btn-primary" id="btn-in">${t('checkInBtn')}</button>
       <button class="btn btn-primary" id="btn-out">${t('checkOutBtn')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
@@ -216,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
     
     const submitAction = async (actionText, actionLogText) => {
-      const confirmMsg = `【${facilityName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
+      const confirmMsg = `【${locFacName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
       if (!confirm(confirmMsg)) return;
       
       loading.innerText = t('loading');
@@ -227,24 +249,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       loading.classList.add('hidden');
       if (success) {
         
-        // ★修正箇所: チェックイン完了時のメッセージ出し分け
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           
           if (schSchHoppotta.includes(facilityName)) {
-            // sch-sch / ホッポッタ の場合
             let msgWelcome = t('ci_msg_welcome');
-            // {facility} と {name} を実際の値に置換
-            msgWelcome = msgWelcome.replace('{facility}', facilityName).replace('{name}', guestName);
+            // ★修正箇所: カタカナのままにならないよう、翻訳済みの施設名(locFacName)を使って置換
+            msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
             
             const msgSupport = t('ci_msg_support');
             alert(`${msgWelcome}\n\n${msgSupport}`);
           } else {
-            // kukka / LUONTO の場合
             alert(`${t('ci_msg_staff_contact')}\n\n${t('ci_msg_wifi')}\n\n${t('ci_msg_contact_method')}`);
           }
         } else {
-          // チェックアウト等の場合は従来通り
           alert(t('sendSuccess'));
         }
 
@@ -296,7 +314,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
       
-      const messageToChat = `【${categoryName}】\n施設：${facilityName}\nお名前：${guestName} 様\n\n${text}`;
+      const locFacName = getLocalizedFacilityName(facilityName);
+      const messageToChat = `【${categoryName}】\n施設：${locFacName}\nお名前：${guestName} 様\n\n${text}`;
       const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
       if (!confirm(confirmMsg)) return;
 
