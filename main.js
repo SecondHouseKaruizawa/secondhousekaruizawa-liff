@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return key;
   }
 
-  // ★新規追加: 変数として保持している施設名を、現在の選択言語に合わせて正しく翻訳する機能
   function getLocalizedFacilityName(name) {
     let facId = null;
     for (const lang in APP_CONFIG.facilities) {
@@ -153,6 +152,48 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
+  // 【新設】バーチャルツアー施設選択メニュー
+  // ==========================================
+  function renderVirtualTourMenu(source, guestName = "", facilityName = "") {
+    let html = `
+      ${renderLangSelectorHtml()}
+      <h2>${t('virtualTour')}</h2>
+    `;
+    
+    const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
+    currentFacilities.forEach(facility => {
+      html += `<button class="btn btn-primary btn-vt" data-id="${facility.id}">${facility.name}</button>`;
+    });
+    
+    html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
+    
+    appContent.innerHTML = html;
+    bindLangSelectorEvents(renderVirtualTourMenu, source, guestName, facilityName);
+
+    document.querySelectorAll('.btn-vt').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const facilityId = e.target.getAttribute('data-id');
+        const vtUrl = APP_CONFIG.virtualTourUrls[facilityId];
+        if(vtUrl) {
+          if (liff.isInClient()) {
+            liff.openWindow({ url: vtUrl, external: true });
+          } else {
+            window.open(vtUrl, '_blank');
+          }
+        }
+      });
+    });
+    
+    document.getElementById('btn-back').addEventListener('click', () => {
+      if (source === 'guest') {
+        renderGuestActionMenu(guestName, facilityName);
+      } else {
+        renderNonGuestMenu();
+      }
+    });
+  }
+
+  // ==========================================
   // 【階層③〜】既存の宿泊ゲスト向けフロー
   // ==========================================
   function renderGuestNameForm() {
@@ -204,13 +245,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestActionMenu(guestName, facilityName) {
-    // ★修正箇所：現在選択されている言語の正しい施設名に自動変換して表示
     const locFacName = getLocalizedFacilityName(facilityName);
     
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>【${locFacName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
+      <button class="btn btn-primary" id="btn-virtual-tour">${t('virtualTour')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
       <button class="btn btn-danger" id="btn-close">${t('closeApp')}</button>
@@ -218,6 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderGuestActionMenu, guestName, facilityName);
 
     document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
+    document.getElementById('btn-virtual-tour').addEventListener('click', () => renderVirtualTourMenu('guest', guestName, facilityName));
     document.getElementById('btn-survey').addEventListener('click', () => {
       window.location.href = APP_CONFIG.surveyUrls[currentLang] || APP_CONFIG.surveyUrls['ja'];
     });
@@ -254,7 +296,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            // ★修正箇所: カタカナのままにならないよう、翻訳済みの施設名(locFacName)を使って置換
             msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
             
             const msgSupport = t('ci_msg_support');
@@ -352,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${renderLangSelectorHtml()}
       <h2>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-book">${t('bookMenu')}</button>
+      <button class="btn btn-primary" id="btn-virtual-tour-nonguest">${t('virtualTour')}</button>
       <button class="btn btn-primary" id="btn-inquiry">${t('inquiryMenu')}</button>
       <button class="btn btn-danger" id="btn-close">${t('closeApp')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
@@ -359,6 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderNonGuestMenu);
 
     document.getElementById('btn-book').addEventListener('click', renderBookingMenu);
+    document.getElementById('btn-virtual-tour-nonguest').addEventListener('click', () => renderVirtualTourMenu('nonguest'));
     document.getElementById('btn-inquiry').addEventListener('click', renderNonGuestInquiryForm);
     document.getElementById('btn-close').addEventListener('click', closeApp);
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);

@@ -41,6 +41,14 @@ const APP_CONFIG = {
     "LU": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2Second%20House%20LUONTO&waypoints=36.443333%2C138.578694&dir_action=navigate"
   },
 
+  // ▼ バーチャルツアー用URLマスタ
+  "virtualTourUrls": {
+    "sc": "https://vt.eiika.co.jp/sch-sch/",
+    "Hp": "https://vt.eiika.co.jp/hoppotta/",
+    "ku": "https://vt.eiika.co.jp/kukka/",
+    "LU": "https://vt.eiika.co.jp/luonto/"
+  },
+
   // ▼ 言語別アンケートURLマスタ
   "surveyUrls": {
     "ja": "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAO__dEP6D5UNFlQN0QyQlQxOE5QOVNETkpXM0dYMjdOVi4u",
@@ -69,6 +77,7 @@ const APP_CONFIG = {
       "checkinout": "チェックイン・チェックアウト",
       "survey": "アンケート回答",
       "contact": "質問・スタッフへ連絡",
+      "virtualTour": "室内バーチャルツアー",
       "bookMenu": "ご予約 (※HP経由の予約となります)",
       "bookReturning": "2回目以降のご予約",
       "bookFirstTime": "初めてのご予約",
@@ -111,11 +120,9 @@ const APP_CONFIG = {
       "locationWarning": "※端末の位置情報をONにしたうえでご利用ください。",
       "accessPrefix": "",
       "accessSuffix": "へのアクセス",
-      // ★新規追加: kukka, LUONTO用チェックインメッセージ
       "ci_msg_staff_contact": "宿泊施設のご案内について、このあと当LINE上にてスタッフから連絡させていただきます。",
       "ci_msg_wifi": "お手数ですが、ご宿泊の施設が提供するWiFiへ接続してお待ちください。",
       "ci_msg_contact_method": "スタッフの対応状況により、電話もしくはメッセージにてご連絡差し上げます。",
-      // ★新規追加: sch-sch, ホッポッタ用チェックインメッセージ
       "ci_msg_welcome": "ようこそ、{facility}へ！{name}様のチェックイン処理を受け付けました。",
       "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、当LINEもしくは電話にてお気軽にご連絡ください。"
     },
@@ -130,6 +137,7 @@ const APP_CONFIG = {
       "checkinout": "Check-In / Check-Out",
       "survey": "Guest Feedback",
       "contact": "Other / Contact Staff",
+      "virtualTour": "360°Virtual Room Tour",
       "bookMenu": "Book (Via our official website)",
       "bookReturning": "Returning guest booking",
       "bookFirstTime": "First-time booking",
@@ -189,6 +197,7 @@ const APP_CONFIG = {
       "checkinout": "入住登記・退房手續",
       "survey": "填寫問卷",
       "contact": "其他事項 / 聯絡專員",
+      "virtualTour": "室內虛擬導覽",
       "bookMenu": "預約 (前往官方網站預約)",
       "bookReturning": "再次入住預約",
       "bookFirstTime": "首次預約",
@@ -248,53 +257,11 @@ const APP_CONFIG = {
       "checkinout": "入住登记・退房手续",
       "survey": "填写问卷",
       "contact": "其他事项 / 联系专员",
+      "virtualTour": "室内虚拟导览",
       "bookMenu": "预约 (前往官方网站预约)",
       "bookReturning": "再次入住预约",
       "bookFirstTime": "首次预约",
       "inquiryMenu": "咨询",
       "closeApp": "结束",
       "back": "返回",
-      "next": "下一步",
-      "namePrompt": "首先，请输入代表人姓名",
-      "selectFacility": "请选择您入住的设施",
-      "selectAction": "请选择您要办理的项目",
-      "namePlaceholder": "代表人姓名",
-      "checkInBtn": "抵达・办理入住",
-      "checkOutBtn": "离开・办理退房",
-      "sendSuccess": "发送成功。",
-      "nameAlert": "请输入您的姓名。",
-      "selectContactCat": "请选择您的咨询类别",
-      "yourName": "您的姓名",
-      "inquiryPlaceholder": "请输入您的问题...",
-      "sendLine": "通过 LINE 发送",
-      "inquirySuccess": "已发送，请等待工作人员回复。",
-      "inquiryAlert": "请输入姓名和内容。",
-      "nonGuestInquiryName": "一般咨询(Inquiry)",
-      "cat_equip": "关于设施与备品",
-      "cat_stay": "关于住宿",
-      "cat_others": "其他",
-      "lastStayDetail": "确认上次入住时间",
-      "stayYear": "年 (例: 2023)",
-      "stayMonth": "月 (例: 10)",
-      "pastName": "上次预约姓名",
-      "couponCode": "优惠码等 (选填)",
-      "proceedHp": "前往官方网站预约",
-      "confirmSend": "是否确定发送以下内容？",
-      "pcFallbackSuccess": "因使用电脑环境，已通过系统发送给工作人员。请稍候回复。",
-      "sendFail": "发送失败: ",
-      "validationAlert": "年、月、入住设施、上次预约姓名为必填项目。",
-      "sessionExpired": "认证已过期，将重新登录。",
-      "guestTopMenuPrompt": "请选择菜单",
-      "duringStay": "住宿期间菜单<br><small>(入住登记・咨询等)</small>",
-      "routeAccess": "前往设施的路线导航",
-      "locationWarning": "※请在开启设备定位服务后使用。",
-      "accessPrefix": "前往",
-      "accessSuffix": "",
-      "ci_msg_staff_contact": "关于住宿设施的向导，稍后我们的工作人员将通过此LINE与您联系。",
-      "ci_msg_wifi": "麻烦您先连接至设施提供的WiFi并稍候。",
-      "ci_msg_contact_method": "视工作人员的服务状况，我们将通过电话或消息与您联系。",
-      "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
-      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时通过此LINE或电话与我们联系。"
-    }
-  }
-};
+      "
