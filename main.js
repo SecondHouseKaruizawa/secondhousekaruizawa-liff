@@ -102,12 +102,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h2>${t('guestTopMenuPrompt')}</h2>
       <button class="btn btn-primary" id="btn-during-stay">${t('duringStay')}</button>
       <button class="btn btn-primary" id="btn-route-access">${t('routeAccess')}</button>
+      <!-- ★修正：宿泊ゲスト向けのバーチャルツアーボタンを階層②に追加 -->
+      <button class="btn btn-primary" id="btn-virtual-tour-guest">${t('virtualTour')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
     bindLangSelectorEvents(renderGuestTopMenu);
 
     document.getElementById('btn-during-stay').addEventListener('click', renderGuestNameForm);
     document.getElementById('btn-route-access').addEventListener('click', renderRouteAccessMenu);
+    document.getElementById('btn-virtual-tour-guest').addEventListener('click', () => renderVirtualTourMenu('guest'));
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);
   }
 
@@ -154,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // 【新設】バーチャルツアー施設選択メニュー
   // ==========================================
-  function renderVirtualTourMenu(source, guestName = "", facilityName = "") {
+  function renderVirtualTourMenu(source) {
     let html = `
       ${renderLangSelectorHtml()}
       <h2>${t('virtualTour')}</h2>
@@ -168,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
     
     appContent.innerHTML = html;
-    bindLangSelectorEvents(renderVirtualTourMenu, source, guestName, facilityName);
+    bindLangSelectorEvents(renderVirtualTourMenu, source);
 
     document.querySelectorAll('.btn-vt').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -185,8 +188,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     
     document.getElementById('btn-back').addEventListener('click', () => {
+      // ★修正：戻るボタンの遷移先を制御
       if (source === 'guest') {
-        renderGuestActionMenu(guestName, facilityName);
+        renderGuestTopMenu();
       } else {
         renderNonGuestMenu();
       }
@@ -251,7 +255,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       ${renderLangSelectorHtml()}
       <h2>【${locFacName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
-      <button class="btn btn-primary" id="btn-virtual-tour">${t('virtualTour')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
       <button class="btn btn-danger" id="btn-close">${t('closeApp')}</button>
@@ -259,7 +262,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderGuestActionMenu, guestName, facilityName);
 
     document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
-    document.getElementById('btn-virtual-tour').addEventListener('click', () => renderVirtualTourMenu('guest', guestName, facilityName));
     document.getElementById('btn-survey').addEventListener('click', () => {
       window.location.href = APP_CONFIG.surveyUrls[currentLang] || APP_CONFIG.surveyUrls['ja'];
     });
