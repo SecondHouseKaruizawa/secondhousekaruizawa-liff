@@ -33,6 +33,34 @@ const APP_CONFIG = {
     ]
   },
 
+  // ▼ 予約経路マスタ（OTA認証用選択肢）
+  "bookingChannels": {
+    "ja": [
+      { "id": "hp", "name": "公式サイト (HP)" },
+      { "id": "airbnb", "name": "Airbnb" },
+      { "id": "booking", "name": "Booking.com" },
+      { "id": "other", "name": "その他" }
+    ],
+    "en": [
+      { "id": "hp", "name": "Official Website" },
+      { "id": "airbnb", "name": "Airbnb" },
+      { "id": "booking", "name": "Booking.com" },
+      { "id": "other", "name": "Other" }
+    ],
+    "zh-TW": [
+      { "id": "hp", "name": "官方網站 (HP)" },
+      { "id": "airbnb", "name": "Airbnb" },
+      { "id": "booking", "name": "Booking.com" },
+      { "id": "other", "name": "其他" }
+    ],
+    "zh-CN": [
+      { "id": "hp", "name": "官方网站 (HP)" },
+      { "id": "airbnb", "name": "Airbnb" },
+      { "id": "booking", "name": "Booking.com" },
+      { "id": "other", "name": "其他" }
+    ]
+  },
+
   // ▼ 道案内（Google Map）用URLマスタ
   "mapUrls": {
     "sc": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2%20%E8%B2%B8%E5%88%A5%E8%88%98%20Second%20House%20sch-sch&waypoints=36.446297%2C138.572883%7C36.455880%2C138.568743%7C36.463130%2C138.556438&dir_action=navigate",
@@ -110,9 +138,9 @@ const APP_CONFIG = {
       "couponCode": "クーポンコード等の入力 (任意)",
       "proceedHp": "公式HPの予約ページへ",
       "confirmSend": "以下の内容を送信しますか？",
-      "pcFallbackSuccess": "PC環境からのため、システム経由でスタッフへ送信しました。返信をお待ちください。",
+      "pcFallbackSuccess": "送信しました。スタッフからの返信をお待ちください。",
       "sendFail": "送信に失敗しました: ",
-      "validationAlert": "年、月、滞在施設、前回ご予約時のお名前は必須入力です。",
+      "validationAlert": "すべての項目を選択・入力してください。",
       "sessionExpired": "認証セッションが切れました。再ログインを行います。",
       "guestTopMenuPrompt": "ご希望のメニューをご選択ください",
       "duringStay": "滞在中メニュー<br><small>(チェックイン・お問い合わせ等)</small>",
@@ -120,13 +148,22 @@ const APP_CONFIG = {
       "locationWarning": "※端末の位置情報をONにしたうえでご利用ください。",
       "accessPrefix": "",
       "accessSuffix": "へのアクセス",
-      "ci_msg_staff_contact": "宿泊施設のご案内について、このあと当LINE上にてスタッフから連絡させていただきます。",
+      "ci_msg_staff_contact": "宿泊施設のご案内について、このあとスタッフからご連絡させていただきます。",
       "ci_msg_wifi": "お手数ですが、ご宿泊の施設が提供するWiFiへ接続してお待ちください。",
       "ci_msg_contact_method": "スタッフの対応状況により、電話もしくはメッセージにてご連絡差し上げます。",
       "ci_msg_welcome": "ようこそ、{facility}へ！{name}様のチェックイン処理を受け付けました。",
-      "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、当LINEもしくは電話にてお気軽にご連絡ください。",
+      "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、お気軽にご連絡ください。",
       "maintTitle": "メンテナンス中",
-      "maintMsg": "現在システムメンテナンス中です。<br>ご不便をおかけしますが、終了までしばらくお待ちください。"
+      "maintMsg": "現在システムメンテナンス中です。<br>ご不便をおかけしますが、終了までしばらくお待ちください。",
+      // ▼ OTA認証画面用文言
+      "authPrompt": "ご予約情報をご選択ください",
+      "checkInDate": "チェックイン日",
+      "nights": "宿泊日数",
+      "adults": "大人人数",
+      "channel": "予約経路",
+      "authSubmit": "認証して進む",
+      "authError": "該当する予約情報が見つかりませんでした。選択内容をご確認ください。",
+      "authLocked": "認証失敗が続いたため、セキュリティ保護により一時的にアクセスを制限しています。しばらく経ってから再度お試しください。"
     },
     "en": {
       "loading": "Loading system...",
@@ -158,7 +195,7 @@ const APP_CONFIG = {
       "selectContactCat": "Please select an inquiry category",
       "yourName": "Your Name",
       "inquiryPlaceholder": "Please enter your question...",
-      "sendLine": "Send via LINE",
+      "sendLine": "Send",
       "inquirySuccess": "Sent. Please wait for a reply from our staff.",
       "inquiryAlert": "Please enter your name and message.",
       "nonGuestInquiryName": "General Inquiry",
@@ -172,9 +209,9 @@ const APP_CONFIG = {
       "couponCode": "Any code if available (Optional)",
       "proceedHp": "Proceed to Official Booking Page",
       "confirmSend": "Are you sure you want to send the following details?",
-      "pcFallbackSuccess": "Sent via system for PC environment. Please wait for a reply.",
+      "pcFallbackSuccess": "Sent. Please wait for a reply.",
       "sendFail": "Failed to send: ",
-      "validationAlert": "Year, Month, Facility, and Previous Name are required fields.",
+      "validationAlert": "Please select and fill in all fields.",
       "sessionExpired": "Session expired. Please log in again.",
       "guestTopMenuPrompt": "Please select a menu",
       "duringStay": "During your stay<br><small>(Check-in / Contact etc.)</small>",
@@ -182,13 +219,22 @@ const APP_CONFIG = {
       "locationWarning": "*Please turn on location services before use.",
       "accessPrefix": "To ",
       "accessSuffix": "",
-      "ci_msg_staff_contact": "Our staff will contact you shortly via this LINE regarding facility instructions.",
+      "ci_msg_staff_contact": "Our staff will contact you shortly regarding facility instructions.",
       "ci_msg_wifi": "Please connect to the facility's WiFi and wait.",
       "ci_msg_contact_method": "Depending on our staff's availability, we will contact you by phone or message.",
       "ci_msg_welcome": "Welcome to {facility}! We have received the check-in request for {name}.",
-      "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us via this LINE or by phone.",
+      "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us.",
       "maintTitle": "Under Maintenance",
-      "maintMsg": "The system is currently under maintenance.<br>We apologize for the inconvenience and appreciate your patience."
+      "maintMsg": "The system is currently under maintenance.<br>We apologize for the inconvenience and appreciate your patience.",
+      // ▼ OTA認証画面用文言
+      "authPrompt": "Please select your booking details",
+      "checkInDate": "Check-in Date",
+      "nights": "Nights",
+      "adults": "Adults",
+      "channel": "Booking Channel",
+      "authSubmit": "Verify & Proceed",
+      "authError": "Matching reservation not found. Please check your selections.",
+      "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later."
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -206,7 +252,7 @@ const APP_CONFIG = {
       "bookReturning": "再次入住預約",
       "bookFirstTime": "首次預約",
       "inquiryMenu": "諮詢",
-      "closeApp": "結束",
+      "closeApp": "關閉",
       "back": "返回",
       "next": "下一步",
       "namePrompt": "首先，請輸入代表人姓名",
@@ -220,7 +266,7 @@ const APP_CONFIG = {
       "selectContactCat": "請選擇您的諮詢類別",
       "yourName": "您的姓名",
       "inquiryPlaceholder": "請在此輸入您的問題或需求...",
-      "sendLine": "透過 LINE 送出",
+      "sendLine": "送出",
       "inquirySuccess": "已成功送出，請靜候服務人員回覆。",
       "inquiryAlert": "請完整填寫姓名與內容。",
       "nonGuestInquiryName": "一般諮詢(Inquiry)",
@@ -234,23 +280,32 @@ const APP_CONFIG = {
       "couponCode": "優惠碼等 (選填)",
       "proceedHp": "前往官方網站預約",
       "confirmSend": "是否確定送出以下內容？",
-      "pcFallbackSuccess": "因使用電腦環境，已透過系統發送給工作人員。請稍候回覆。",
+      "pcFallbackSuccess": "已成功送出，請稍候回覆。",
       "sendFail": "發送失敗: ",
-      "validationAlert": "年、月、入住設施、上次預約姓名為必填項目。",
-      "sessionExpired": "認證已過期，將重新登入。",
+      "validationAlert": "請填寫並選擇所有欄位。",
+      "sessionExpired": "認證已過期，將重新載入。",
       "guestTopMenuPrompt": "請選擇選單",
       "duringStay": "住宿期間選單<br><small>(入住登記・諮詢等)</small>",
       "routeAccess": "前往設施的路線導航",
       "locationWarning": "※請在開啟裝置定位服務後使用。",
       "accessPrefix": "前往",
       "accessSuffix": "",
-      "ci_msg_staff_contact": "關於住宿設施的導覽，稍後我們的工作人員將透過此LINE與您聯繫。",
+      "ci_msg_staff_contact": "關於住宿設施的導覽，稍後我們的工作人員將與您聯繫。",
       "ci_msg_wifi": "麻煩您先連線至設施提供的WiFi並稍候。",
       "ci_msg_contact_method": "視工作人員的服務狀況，我們將透過電話或訊息與您聯繫。",
       "ci_msg_welcome": "歡迎來到 {facility}！我們已收到 {name} 貴賓的入住辦理。",
-      "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時透過此LINE或電話與我們聯繫。",
+      "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時與我們聯繫。",
       "maintTitle": "系統維護中",
-      "maintMsg": "系統目前正在進行維護。<br>造成您的不便敬請見諒，請稍後再試。"
+      "maintMsg": "系統目前正在進行維護。<br>造成您的不便敬請見諒，請稍後再試。",
+      // ▼ OTA認証画面用文言
+      "authPrompt": "請選擇您的預訂資訊",
+      "checkInDate": "入住日期",
+      "nights": "住宿晚數",
+      "adults": "成人人數",
+      "channel": "預訂管道",
+      "authSubmit": "驗證並進入",
+      "authError": "找不到相符的預訂資訊，請確認您的選擇內容。",
+      "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -268,7 +323,7 @@ const APP_CONFIG = {
       "bookReturning": "再次入住预约",
       "bookFirstTime": "首次预约",
       "inquiryMenu": "咨询",
-      "closeApp": "结束",
+      "closeApp": "关闭",
       "back": "返回",
       "next": "下一步",
       "namePrompt": "首先，请输入代表人姓名",
@@ -282,7 +337,7 @@ const APP_CONFIG = {
       "selectContactCat": "请选择您的咨询类别",
       "yourName": "您的姓名",
       "inquiryPlaceholder": "请输入您的问题...",
-      "sendLine": "通过 LINE 发送",
+      "sendLine": "发送",
       "inquirySuccess": "已发送，请等待工作人员回复。",
       "inquiryAlert": "请输入姓名和内容。",
       "nonGuestInquiryName": "一般咨询(Inquiry)",
@@ -296,23 +351,32 @@ const APP_CONFIG = {
       "couponCode": "优惠码等 (选填)",
       "proceedHp": "前往官方网站预约",
       "confirmSend": "是否确定发送以下内容？",
-      "pcFallbackSuccess": "因使用电脑环境，已通过系统发送给工作人员。请稍候回复。",
+      "pcFallbackSuccess": "已发送，请稍候回复。",
       "sendFail": "发送失败: ",
-      "validationAlert": "年、月、入住设施、上次预约姓名为必填项目。",
-      "sessionExpired": "认证已过期，将重新登录。",
+      "validationAlert": "请填写并选择所有字段。",
+      "sessionExpired": "认证已过期，将重新加载。",
       "guestTopMenuPrompt": "请选择菜单",
       "duringStay": "住宿期间菜单<br><small>(入住登记・咨询等)</small>",
       "routeAccess": "前往设施的路线导航",
       "locationWarning": "※请在开启设备定位服务后使用。",
       "accessPrefix": "前往",
       "accessSuffix": "",
-      "ci_msg_staff_contact": "关于住宿设施的向导，稍后我们的工作人员将通过此LINE与您联系。",
+      "ci_msg_staff_contact": "关于住宿设施的向导，稍后我们的工作人员将与您联系。",
       "ci_msg_wifi": "麻烦您先连接至设施提供的WiFi并稍候。",
       "ci_msg_contact_method": "视工作人员的服务状况，我们将通过电话或消息与您联系。",
       "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
-      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时通过此LINE或电话与我们联系。",
+      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时与我们联系。",
       "maintTitle": "系统维护中",
-      "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见谅，请稍后再试。"
+      "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见諒，请稍后再试。",
+      // ▼ OTA認証画面用文言
+      "authPrompt": "请选择您的预订信息",
+      "checkInDate": "入住日期",
+      "nights": "住宿晚数",
+      "adults": "成人人数",
+      "channel": "预订渠道",
+      "authSubmit": "验证并进入",
+      "authError": "找不到相符的预订信息，请确认您的选择内容。",
+      "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。"
     }
   }
 };
