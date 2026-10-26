@@ -33,30 +33,58 @@ const APP_CONFIG = {
     ]
   },
 
-  // ▼ 予約経路マスタ（OTA認証用選択肢）
+  // ▼ 予約経路マスタ（OTA認証用選択肢・追加対応）
   "bookingChannels": {
     "ja": [
       { "id": "hp", "name": "公式サイト (HP)" },
       { "id": "airbnb", "name": "Airbnb" },
       { "id": "booking", "name": "Booking.com" },
+      { "id": "klook", "name": "Klook" },
+      { "id": "trip", "name": "Trip.com / Ctrip" },
+      { "id": "agoda", "name": "Agoda" },
+      { "id": "rakuten", "name": "Rakuten Oyado" },
+      { "id": "cotte", "name": "Cotte" },
+      { "id": "aco", "name": "ACO" },
+      { "id": "tabilmo", "name": "TABILMO" },
       { "id": "other", "name": "その他" }
     ],
     "en": [
       { "id": "hp", "name": "Official Website" },
       { "id": "airbnb", "name": "Airbnb" },
       { "id": "booking", "name": "Booking.com" },
+      { "id": "klook", "name": "Klook" },
+      { "id": "trip", "name": "Trip.com / Ctrip" },
+      { "id": "agoda", "name": "Agoda" },
+      { "id": "rakuten", "name": "Rakuten Oyado" },
+      { "id": "cotte", "name": "Cotte" },
+      { "id": "aco", "name": "ACO" },
+      { "id": "tabilmo", "name": "TABILMO" },
       { "id": "other", "name": "Other" }
     ],
     "zh-TW": [
       { "id": "hp", "name": "官方網站 (HP)" },
       { "id": "airbnb", "name": "Airbnb" },
       { "id": "booking", "name": "Booking.com" },
+      { "id": "klook", "name": "Klook" },
+      { "id": "trip", "name": "Trip.com / Ctrip" },
+      { "id": "agoda", "name": "Agoda" },
+      { "id": "rakuten", "name": "Rakuten Oyado" },
+      { "id": "cotte", "name": "Cotte" },
+      { "id": "aco", "name": "ACO" },
+      { "id": "tabilmo", "name": "TABILMO" },
       { "id": "other", "name": "其他" }
     ],
     "zh-CN": [
       { "id": "hp", "name": "官方网站 (HP)" },
       { "id": "airbnb", "name": "Airbnb" },
       { "id": "booking", "name": "Booking.com" },
+      { "id": "klook", "name": "Klook" },
+      { "id": "trip", "name": "Trip.com / Ctrip" },
+      { "id": "agoda", "name": "Agoda" },
+      { "id": "rakuten", "name": "Rakuten Oyado" },
+      { "id": "cotte", "name": "Cotte" },
+      { "id": "aco", "name": "ACO" },
+      { "id": "tabilmo", "name": "TABILMO" },
       { "id": "other", "name": "其他" }
     ]
   },
@@ -155,7 +183,7 @@ const APP_CONFIG = {
       "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、お気軽にご連絡ください。",
       "maintTitle": "メンテナンス中",
       "maintMsg": "現在システムメンテナンス中です。<br>ご不便をおかけしますが、終了までしばらくお待ちください。",
-      // ▼ OTA認証画面用文言
+      // ▼ OTA認証画面用文言（Cotte注意書き追加）
       "authPrompt": "ご予約情報をご選択ください",
       "checkInDate": "チェックイン日",
       "nights": "宿泊日数",
@@ -163,7 +191,8 @@ const APP_CONFIG = {
       "channel": "予約経路",
       "authSubmit": "認証して進む",
       "authError": "該当する予約情報が見つかりませんでした。選択内容をご確認ください。",
-      "authLocked": "認証失敗が続いたため、セキュリティ保護により一時的にアクセスを制限しています。しばらく経ってから再度お試しください。"
+      "authLocked": "認証失敗が続いたため、セキュリティ保護により一時的にアクセスを制限しています。しばらく経ってから再度お試しください。",
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
     },
     "en": {
       "loading": "Loading system...",
@@ -226,7 +255,7 @@ const APP_CONFIG = {
       "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us.",
       "maintTitle": "Under Maintenance",
       "maintMsg": "The system is currently under maintenance.<br>We apologize for the inconvenience and appreciate your patience.",
-      // ▼ OTA認証画面用文言
+      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "Please select your booking details",
       "checkInDate": "Check-in Date",
       "nights": "Nights",
@@ -234,7 +263,8 @@ const APP_CONFIG = {
       "channel": "Booking Channel",
       "authSubmit": "Verify & Proceed",
       "authError": "Matching reservation not found. Please check your selections.",
-      "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later."
+      "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later.",
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -297,7 +327,7 @@ const APP_CONFIG = {
       "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時與我們聯繫。",
       "maintTitle": "系統維護中",
       "maintMsg": "系統目前正在進行維護。<br>造成您的不便敬請見諒，請稍後再試。",
-      // ▼ OTA認証画面用文言
+      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "請選擇您的預訂資訊",
       "checkInDate": "入住日期",
       "nights": "住宿晚數",
@@ -305,7 +335,8 @@ const APP_CONFIG = {
       "channel": "預訂管道",
       "authSubmit": "驗證並進入",
       "authError": "找不到相符的預訂資訊，請確認您的選擇內容。",
-      "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。"
+      "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。",
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -363,12 +394,12 @@ const APP_CONFIG = {
       "accessSuffix": "",
       "ci_msg_staff_contact": "关于住宿设施的向导，稍后我们的工作人员将与您联系。",
       "ci_msg_wifi": "麻烦您先连接至设施提供的WiFi并稍候。",
-      "ci_msg_contact_method": "视工作人员的服务状况，我们将通过电话或消息与您联系。",
+      "ci_msg_contact_method": "视工作人员的工作状况，我们将通过电话或消息与您联系。",
       "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
       "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时与我们联系。",
       "maintTitle": "系统维护中",
       "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见諒，请稍后再试。",
-      // ▼ OTA認証画面用文言
+      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "请选择您的预订信息",
       "checkInDate": "入住日期",
       "nights": "住宿晚数",
@@ -376,7 +407,8 @@ const APP_CONFIG = {
       "channel": "预订渠道",
       "authSubmit": "验证并进入",
       "authError": "找不到相符的预订信息，请确认您的选择内容。",
-      "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。"
+      "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。",
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
     }
   }
 };
