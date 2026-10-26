@@ -124,7 +124,9 @@ const APP_CONFIG = {
       "ci_msg_wifi": "お手数ですが、ご宿泊の施設が提供するWiFiへ接続してお待ちください。",
       "ci_msg_contact_method": "スタッフの対応状況により、電話もしくはメッセージにてご連絡差し上げます。",
       "ci_msg_welcome": "ようこそ、{facility}へ！{name}様のチェックイン処理を受け付けました。",
-      "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、当LINEもしくは電話にてお気軽にご連絡ください。"
+      "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、当LINEもしくは電話にてお気軽にご連絡ください。",
+      "maintTitle": "メンテナンス中",
+      "maintMsg": "現在システムメンテナンス中です。<br>ご不便をおかけしますが、終了までしばらくお待ちください。"
     },
     "en": {
       "loading": "Loading system...",
@@ -184,7 +186,9 @@ const APP_CONFIG = {
       "ci_msg_wifi": "Please connect to the facility's WiFi and wait.",
       "ci_msg_contact_method": "Depending on our staff's availability, we will contact you by phone or message.",
       "ci_msg_welcome": "Welcome to {facility}! We have received the check-in request for {name}.",
-      "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us via this LINE or by phone."
+      "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us via this LINE or by phone.",
+      "maintTitle": "Under Maintenance",
+      "maintMsg": "The system is currently under maintenance.<br>We apologize for the inconvenience and appreciate your patience."
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -244,7 +248,9 @@ const APP_CONFIG = {
       "ci_msg_wifi": "麻煩您先連線至設施提供的WiFi並稍候。",
       "ci_msg_contact_method": "視工作人員的服務狀況，我們將透過電話或訊息與您聯繫。",
       "ci_msg_welcome": "歡迎來到 {facility}！我們已收到 {name} 貴賓的入住辦理。",
-      "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時透過此LINE或電話與我們聯繫。"
+      "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時透過此LINE或電話與我們聯繫。",
+      "maintTitle": "系統維護中",
+      "maintMsg": "系統目前正在進行維護。<br>造成您的不便敬請見諒，請稍後再試。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -304,7 +310,9 @@ const APP_CONFIG = {
       "ci_msg_wifi": "麻烦您先连接至设施提供的WiFi并稍候。",
       "ci_msg_contact_method": "视工作人员的服务状况，我们将通过电话或消息与您联系。",
       "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
-      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时通过此LINE或电话与我们联系。"
+      "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时通过此LINE或电话与我们联系。",
+      "maintTitle": "系统维护中",
+      "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见谅，请稍后再试。"
     }
   }
 };

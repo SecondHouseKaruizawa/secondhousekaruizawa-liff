@@ -69,12 +69,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // ★ 起動時のメンテナンスステータス確認通信
+    const idToken = liff.getIDToken();
+    const response = await fetch(APP_CONFIG.GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'check_status', idToken: idToken })
+    });
+    const result = await response.json();
+
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
 
-    renderTopMenu();
+    if (result.isMaintenance) {
+      renderMaintenanceScreen();
+    } else {
+      renderTopMenu();
+    }
   } catch (error) {
     loading.innerText = 'エラーが発生しました: ' + error.message;
+  }
+
+  // ==========================================
+  // 【新設】メンテナンス専用画面
+  // ==========================================
+  function renderMaintenanceScreen() {
+    appContent.innerHTML = `
+      <div style="text-align: center; padding: 20px;">
+        <h2>🚧 ${t('maintTitle')} 🚧</h2>
+        <p style="font-size: 15px; line-height: 1.6; margin-top: 20px;">${t('maintMsg')}</p>
+        <button class="btn btn-danger" id="btn-close" style="margin-top: 30px;">${t('closeApp')}</button>
+      </div>
+    `;
+    document.getElementById('btn-close').addEventListener('click', closeApp);
   }
 
   // ==========================================
@@ -102,7 +128,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h2>${t('guestTopMenuPrompt')}</h2>
       <button class="btn btn-primary" id="btn-during-stay">${t('duringStay')}</button>
       <button class="btn btn-primary" id="btn-route-access">${t('routeAccess')}</button>
-      <!-- ★修正：宿泊ゲスト向けのバーチャルツアーボタンを階層②に追加 -->
       <button class="btn btn-primary" id="btn-virtual-tour-guest">${t('virtualTour')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
@@ -188,7 +213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     
     document.getElementById('btn-back').addEventListener('click', () => {
-      // ★修正：戻るボタンの遷移先を制御
       if (source === 'guest') {
         renderGuestTopMenu();
       } else {
@@ -292,14 +316,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       loading.classList.add('hidden');
       if (success) {
-        
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
-          
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
             msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
-            
             const msgSupport = t('ci_msg_support');
             alert(`${msgWelcome}\n\n${msgSupport}`);
           } else {
@@ -308,7 +329,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           alert(t('sendSuccess'));
         }
-
         renderGuestActionMenu(guestName, facilityName);
       } else {
         alert(t('sendFail') + "(Auth Error)");
