@@ -198,9 +198,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const adults = document.getElementById('auth-adults').value;
       const channel = document.getElementById('auth-channel').value;
 
-      if (!checkinDate || !facility || !nights || !adults || !channel) {
+      // ▼ 【デバッグトリガー判定】チェックイン日 "1991-05-25" ＆ 予約経路 "その他" なら、他の項目が未選択でもバリデーションをスルー
+      const isDebugAttempt = (checkinDate === "1991-05-25") && (channel === "その他" || channel === "Other" || channel === "其他" || channel === "其它");
+
+      if (!isDebugAttempt && (!checkinDate || !facility || !nights || !adults || !channel)) {
         return alert(t('validationAlert'));
       }
+
+      // 未選択項目のフォールバック（デバッグ時用）
+      const finalFacility = facility || APP_CONFIG.facilities['ja'][0].name;
+      const finalNights = nights || "1";
+      const finalAdults = adults || "1";
 
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
@@ -213,7 +221,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             channel: "ota",
             type: "authenticate",
             clientId: clientId,
-            data: { checkinDate, facility, nights, adults, channel }
+            data: { 
+              checkinDate: checkinDate, 
+              facility: finalFacility, 
+              nights: finalNights, 
+              adults: finalAdults, 
+              channel: channel 
+            }
           })
         });
         const result = await response.json();
@@ -221,13 +235,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         loading.classList.add('hidden');
         appContent.classList.remove('hidden');
 
-        // ▼ GAS側がデバッグトリガーを検知して成功を返した場合
         if (result.status === "success" && result.guestName) {
           if (result.isDebugTrigger) {
             localStorage.setItem('ota_debug_skip', 'true');
             alert("【デバッグモード】認証スキップを有効化しました。");
           }
-          renderGuestTopMenu(result.guestName, facility);
+          renderGuestTopMenu(result.guestName, finalFacility);
         } else if (result.status === "locked") {
           renderLockedScreen(result.message || t('authLocked'));
         } else {
