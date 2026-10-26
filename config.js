@@ -33,7 +33,7 @@ const APP_CONFIG = {
     ]
   },
 
-  // ▼ 予約経路マスタ（OTA認証用選択肢・追加対応）
+  // ▼ 予約経路マスタ（OTA認証用選択肢）
   "bookingChannels": {
     "ja": [
       { "id": "hp", "name": "公式サイト (HP)" },
@@ -179,11 +179,10 @@ const APP_CONFIG = {
       "ci_msg_staff_contact": "宿泊施設のご案内について、このあとスタッフからご連絡させていただきます。",
       "ci_msg_wifi": "お手数ですが、ご宿泊の施設が提供するWiFiへ接続してお待ちください。",
       "ci_msg_contact_method": "スタッフの対応状況により、電話もしくはメッセージにてご連絡差し上げます。",
-      "ci_msg_welcome": "ようこそ、{facility}へ！{name}様のチェックイン処理を受け付けました。",
+      "ci_msg_welcome": "ようこそ、{facility}！{name}様のチェックイン処理を受け付けました。",
       "ci_msg_support": "施設の使用や備品に関して、その他問い合わせがありましたら、お気軽にご連絡ください。",
       "maintTitle": "メンテナンス中",
       "maintMsg": "現在システムメンテナンス中です。<br>ご不便をおかけしますが、終了までしばらくお待ちください。",
-      // ▼ OTA認証画面用文言（Cotte注意書き追加）
       "authPrompt": "ご予約情報をご選択ください",
       "checkInDate": "チェックイン日",
       "nights": "宿泊日数",
@@ -192,7 +191,8 @@ const APP_CONFIG = {
       "authSubmit": "認証して進む",
       "authError": "該当する予約情報が見つかりませんでした。選択内容をご確認ください。",
       "authLocked": "認証失敗が続いたため、セキュリティ保護により一時的にアクセスを制限しています。しばらく経ってから再度お試しください。",
-      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
+      "exitDebug": "認証スキップ終了 (通常モードに戻す)"
     },
     "en": {
       "loading": "Loading system...",
@@ -255,7 +255,6 @@ const APP_CONFIG = {
       "ci_msg_support": "If you have any other questions regarding the use of the facility or equipment, please feel free to contact us.",
       "maintTitle": "Under Maintenance",
       "maintMsg": "The system is currently under maintenance.<br>We apologize for the inconvenience and appreciate your patience.",
-      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "Please select your booking details",
       "checkInDate": "Check-in Date",
       "nights": "Nights",
@@ -264,7 +263,8 @@ const APP_CONFIG = {
       "authSubmit": "Verify & Proceed",
       "authError": "Matching reservation not found. Please check your selections.",
       "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later.",
-      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
+      "exitDebug": "Exit Auth Skip (Return to Normal)"
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -327,7 +327,6 @@ const APP_CONFIG = {
       "ci_msg_support": "若對於設施使用或備品有任何疑問，請隨時與我們聯繫。",
       "maintTitle": "系統維護中",
       "maintMsg": "系統目前正在進行維護。<br>造成您的不便敬請見諒，請稍後再試。",
-      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "請選擇您的預訂資訊",
       "checkInDate": "入住日期",
       "nights": "住宿晚數",
@@ -336,7 +335,8 @@ const APP_CONFIG = {
       "authSubmit": "驗證並進入",
       "authError": "找不到相符的預訂資訊，請確認您的選擇內容。",
       "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。",
-      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
+      "exitDebug": "結束驗證略過 (恢復正常模式)"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -399,7 +399,6 @@ const APP_CONFIG = {
       "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时与我们联系。",
       "maintTitle": "系统维护中",
       "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见諒，请稍后再试。",
-      // ▼ OTA認証画面用文言（Cotte注意書き追加：日本語固定）
       "authPrompt": "请选择您的预订信息",
       "checkInDate": "入住日期",
       "nights": "住宿晚数",
@@ -408,7 +407,8 @@ const APP_CONFIG = {
       "authSubmit": "验证并进入",
       "authError": "找不到相符的预订信息，请确认您的选择内容。",
       "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。",
-      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。"
+      "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
+      "exitDebug": "结束验证略过 (恢复正常模式)"
     }
   }
 };

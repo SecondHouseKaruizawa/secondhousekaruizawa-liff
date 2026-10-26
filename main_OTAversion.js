@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentLang = localStorage.getItem('ota_app_lang') || 'ja';
   
-  // 端末ごとの一意のクライアントID（3回失敗ロック用）を生成・保持
   let clientId = localStorage.getItem('ota_client_id');
   if (!clientId) {
     clientId = 'client_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -37,14 +36,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderLangSelectorHtml() {
-    return `
-      <div class="lang-selector">
-        <button class="lang-btn ${currentLang === 'ja' ? 'active' : ''}" data-lang="ja">日本語</button>
-        <button class="lang-btn ${currentLang === 'en' ? 'active' : ''}" data-lang="en">EN</button>
-        <button class="lang-btn ${currentLang === 'zh-TW' ? 'active' : ''}" data-lang="zh-TW">繁體</button>
-        <button class="lang-btn ${currentLang === 'zh-CN' ? 'active' : ''}" data-lang="zh-CN">简体</button>
-      </div>
-    `;
+    return '\
+      <div class="lang-selector">\
+        <button class="lang-btn ' + (currentLang === 'ja' ? 'active' : '') + '" data-lang="ja">日本語</button>\
+        <button class="lang-btn ' + (currentLang === 'en' ? 'active' : '') + '" data-lang="en">EN</button>\
+        <button class="lang-btn ' + (currentLang === 'zh-TW' ? 'active' : '') + '" data-lang="zh-TW">繁體</button>\
+        <button class="lang-btn ' + (currentLang === 'zh-CN' ? 'active' : '') + '" data-lang="zh-CN">简体</button>\
+      </div>\
+    ';
   }
 
   function bindLangSelectorEvents(reRenderFunc, ...args) {
@@ -63,7 +62,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    // 起動時のメンテナンス確認およびロック状態の確認
     const response = await fetch(APP_CONFIG.GAS_URL, {
       method: 'POST',
       body: JSON.stringify({ channel: "ota", type: 'check_status', clientId: clientId })
@@ -83,104 +81,115 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
-    appContent.innerHTML = `<p style="color:red; text-align:center;">初期化エラーが発生しました。<br>ページを再読み込みしてください。</p>`;
+    appContent.innerHTML = '<p style="color:red; text-align:center;">初期化エラーが発生しました。<br>ページを再読み込みしてください。</p>';
   }
 
-  // ==========================================
-  // 【新設】ロック専用画面（3回連続失敗時）
-  // ==========================================
   function renderLockedScreen(msg) {
-    appContent.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h2>🔒 セキュリティ制限</h2>
-        <p style="font-size: 14px; line-height: 1.6; margin-top: 20px; color: #ff4d4f;">${msg}</p>
-        <button class="btn btn-secondary" id="btn-reload" style="margin-top: 30px;">再読み込み</button>
-      </div>
-    `;
+    appContent.innerHTML = '\
+      <div style="text-align: center; padding: 20px;">\
+        <h2>🔒 セキュリティ制限</h2>\
+        <p style="font-size: 14px; line-height: 1.6; margin-top: 20px; color: #ff4d4f;">' + msg + '</p>\
+        <button class="btn btn-secondary" id="btn-reload" style="margin-top: 30px;">再読み込み</button>\
+      </div>\
+    ';
     document.getElementById('btn-reload').addEventListener('click', () => location.reload());
   }
 
-  // ==========================================
-  // 【新設】メンテナンス専用画面
-  // ==========================================
   function renderMaintenanceScreen() {
-    appContent.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
-        <h2>🚧 ${t('maintTitle')} 🚧</h2>
-        <p style="font-size: 15px; line-height: 1.6; margin-top: 20px;">${t('maintMsg')}</p>
-        <button class="btn btn-danger" id="btn-close" style="margin-top: 30px;">${t('closeApp')}</button>
-      </div>
-    `;
+    appContent.innerHTML = '\
+      <div style="text-align: center; padding: 20px;">\
+        <h2>🚧 ' + t('maintTitle') + ' 🚧</h2>\
+        <p style="font-size: 15px; line-height: 1.6; margin-top: 20px;">' + t('maintMsg') + '</p>\
+        <button class="btn btn-danger" id="btn-close" style="margin-top: 30px;">' + t('closeApp') + '</button>\
+      </div>\
+    ';
     document.getElementById('btn-close').addEventListener('click', closeApp);
   }
 
-  // ==========================================
-  // 【新設】完全選択式5項目 認証フォーム
-  // ==========================================
   function renderOtaAuthForm() {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 施設マスタ
+    const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
+    if (isDebugActive) {
+      renderGuestTopMenu("【管理者テスト】祐太朗", APP_CONFIG.facilities['ja'][0].name);
+      return;
+    }
+
     let facilityOptions = '';
     const facilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     facilities.forEach(f => {
-      facilityOptions += `<option value="${f.name}">${f.name}</option>`;
+      facilityOptions += '<option value="' + f.name + '">' + f.name + '</option>';
     });
 
-    // 予約経路マスタ
     let channelOptions = '';
     const channels = APP_CONFIG.bookingChannels[currentLang] || APP_CONFIG.bookingChannels['ja'];
     channels.forEach(c => {
-      channelOptions += `<option value="${c.name}">${c.name}</option>`;
+      channelOptions += '<option value="' + c.name + '">' + c.name + '</option>';
     });
 
-    // 宿泊日数 (1〜10泊)
     let nightOptions = '';
     for (let i = 1; i <= 10; i++) {
-      nightOptions += `<option value="${i}">${i} ${currentLang === 'ja' ? '泊' : 'night(s)'}</option>`;
+      nightOptions += '<option value="' + i + '">' + i + ' ' + (currentLang === 'ja' ? '泊' : 'night(s)') + '</option>';
     }
 
-    // 大人人数 (1〜10名)
     let adultOptions = '';
     for (let i = 1; i <= 10; i++) {
-      adultOptions += `<option value="${i}">${i} ${currentLang === 'ja' ? '名' : 'adult(s)'}</option>`;
+      adultOptions += '<option value="' + i + '">' + i + ' ' + (currentLang === 'ja' ? '名' : 'adult(s)') + '</option>';
     }
 
-    appContent.innerHTML = `
-      ${renderLangSelectorHtml()}
-      <h2>${t('authPrompt')}</h2>
-      
-      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">${t('checkInDate')}</label>
-      <input type="date" id="auth-date" class="input-field" value="${todayStr}" required>
-
-      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">${t('selectFacility')}</label>
-      <select id="auth-facility" class="input-field">
-        <option value="" disabled selected>-- 選択してください --</option>
-        ${facilityOptions}
-      </select>
-
-      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">${t('nights')}</label>
-      <select id="auth-nights" class="input-field">
-        <option value="" disabled selected>-- 選択してください --</option>
-        ${nightOptions}
-      </select>
-
-      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">${t('adults')}</label>
-      <select id="auth-adults" class="input-field">
-        <option value="" disabled selected>-- 選択してください --</option>
-        ${adultOptions}
-      </select>
-
-      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">${t('channel')}</label>
-      <select id="auth-channel" class="input-field">
-        <option value="" disabled selected>-- 選択してください --</option>
-        ${channelOptions}
-      </select>
-
-      <button class="btn btn-primary" id="btn-auth" style="margin-top: 15px;">${t('authSubmit')}</button>
-    `;
+    appContent.innerHTML = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>' + t('authPrompt') + '</h2>\
+      \
+      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('checkInDate') + '</label>\
+      <input type="date" id="auth-date" class="input-field" value="' + todayStr + '" required>\
+\
+      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('selectFacility') + '</label>\
+      <select id="auth-facility" class="input-field">\
+        <option value="" disabled selected>-- 選択してください --</option>\
+        ' + facilityOptions + '\
+      </select>\
+\
+      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('nights') + '</label>\
+      <select id="auth-nights" class="input-field">\
+        <option value="" disabled selected>-- 選択してください --</option>\
+        ' + nightOptions + '\
+      </select>\
+\
+      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('adults') + '</label>\
+      <select id="auth-adults" class="input-field">\
+        <option value="" disabled selected>-- 選択してください --</option>\
+        ' + adultOptions + '\
+      </select>\
+\
+      <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('channel') + '</label>\
+      <select id="auth-channel" class="input-field" title="' + t('cotteNotice') + '">\
+        <option value="" disabled selected>-- 選択してください --</option>\
+        ' + channelOptions + '\
+      </select>\
+      <div id="cotte-notice-box" style="font-size: 12px; color: #d9534f; margin-top: -10px; margin-bottom: 15px; font-weight: bold; line-height: 1.4;">\
+        ' + t('cotteNotice') + '\
+      </div>\
+\
+      <button class="btn btn-primary" id="btn-auth" style="margin-top: 5px;">' + t('authSubmit') + '</button>\
+    ';
 
     bindLangSelectorEvents(renderOtaAuthForm);
+
+    const channelSelect = document.getElementById('auth-channel');
+    let hasAlertedOnFocus = false;
+    channelSelect.addEventListener('focus', () => {
+      if (!hasAlertedOnFocus) {
+        alert(t('cotteNotice'));
+        hasAlertedOnFocus = true;
+      }
+    });
+
+    channelSelect.addEventListener('change', (e) => {
+      if (e.target.value === "Cotte") {
+        alert(t('cotteNotice'));
+      }
+    });
 
     document.getElementById('btn-auth').addEventListener('click', async () => {
       const checkinDate = document.getElementById('auth-date').value;
@@ -212,8 +221,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         loading.classList.add('hidden');
         appContent.classList.remove('hidden');
 
+        // ▼ GAS側がデバッグトリガーを検知して成功を返した場合
         if (result.status === "success" && result.guestName) {
-          // 認証成功：ゲスト名（代表者名）を保持してTOPメニューへ
+          if (result.isDebugTrigger) {
+            localStorage.setItem('ota_debug_skip', 'true');
+            alert("【デバッグモード】認証スキップを有効化しました。");
+          }
           renderGuestTopMenu(result.guestName, facility);
         } else if (result.status === "locked") {
           renderLockedScreen(result.message || t('authLocked'));
@@ -228,46 +241,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ==========================================
-  // 【階層①】宿泊ゲスト向け TOPメニュー
-  // ==========================================
   function renderGuestTopMenu(guestName, facilityName) {
-    appContent.innerHTML = `
-      ${renderLangSelectorHtml()}
-      <h2>【${getLocalizedFacilityName(facilityName)}】<br>${guestName} 様<br>----<br>${t('guestTopMenuPrompt')}</h2>
-      <button class="btn btn-primary" id="btn-during-stay">${t('duringStay')}</button>
-      <button class="btn btn-primary" id="btn-route-access">${t('routeAccess')}</button>
-      <button class="btn btn-primary" id="btn-virtual-tour-guest">${t('virtualTour')}</button>
-      <button class="btn btn-secondary" id="btn-back">認証画面へ戻る</button>
-    `;
+    const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
+
+    let debugExitBtnHtml = '';
+    if (isDebugActive) {
+      debugExitBtnHtml = '<button class="btn btn-danger" id="btn-exit-debug" style="background-color: #d9534f; margin-top: 15px;">' + t('exitDebug') + '</button>';
+    }
+
+    appContent.innerHTML = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>【' + getLocalizedFacilityName(facilityName) + '】<br>' + guestName + ' 様<br>----<br>' + t('guestTopMenuPrompt') + '</h2>\
+      <button class="btn btn-primary" id="btn-during-stay">' + t('duringStay') + '</button>\
+      <button class="btn btn-primary" id="btn-route-access">' + t('routeAccess') + '</button>\
+      <button class="btn btn-primary" id="btn-virtual-tour-guest">' + t('virtualTour') + '</button>\
+      <button class="btn btn-secondary" id="btn-back">認証画面へ戻る</button>\
+      ' + debugExitBtnHtml + '\
+    ';
     bindLangSelectorEvents(renderGuestTopMenu, guestName, facilityName);
 
     document.getElementById('btn-during-stay').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
     document.getElementById('btn-route-access').addEventListener('click', () => renderRouteAccessMenu(guestName, facilityName));
     document.getElementById('btn-virtual-tour-guest').addEventListener('click', () => renderVirtualTourMenu(guestName, facilityName));
     document.getElementById('btn-back').addEventListener('click', renderOtaAuthForm);
+
+    if (isDebugActive) {
+      document.getElementById('btn-exit-debug').addEventListener('click', () => {
+        localStorage.removeItem('ota_debug_skip');
+        alert("認証スキップ（デバッグモード）を終了しました。通常モードに戻ります。");
+        renderOtaAuthForm();
+      });
+    }
   }
 
-  // ==========================================
-  // 【階層②】施設までの道案内メニュー
-  // ==========================================
   function renderRouteAccessMenu(guestName, facilityName) {
-    let html = `
-      ${renderLangSelectorHtml()}
-      <h2>${t('routeAccess')}</h2>
-      <p style="font-size: 13px; color: #ff4d4f; text-align: center; margin-bottom: 15px; font-weight: bold;">${t('locationWarning')}</p>
-    `;
+    let html = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>' + t('routeAccess') + '</h2>\
+      <p style="font-size: 13px; color: #ff4d4f; text-align: center; margin-bottom: 15px; font-weight: bold;">' + t('locationWarning') + '</p>\
+    ';
     
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
       const prefix = t('accessPrefix');
       const suffix = t('accessSuffix'); 
-      const btnText = `${prefix}${facility.name}${suffix}`;
-      html += `<button class="btn btn-primary btn-map" data-id="${facility.id}">${btnText}</button>`;
+      const btnText = prefix + facility.name + suffix;
+      html += '<button class="btn btn-primary btn-map" data-id="' + facility.id + '">' + btnText + '</button>';
     });
     
-    html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+    html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderRouteAccessMenu, guestName, facilityName);
 
@@ -275,31 +297,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', (e) => {
         const facilityId = e.target.getAttribute('data-id');
         const mapUrl = APP_CONFIG.mapUrls[facilityId];
-        if(mapUrl) {
-          window.open(mapUrl, '_blank');
-        }
+        if(mapUrl) window.open(mapUrl, '_blank');
       });
     });
     
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(guestName, facilityName));
   }
 
-  // ==========================================
-  // バーチャルツアー施設選択メニュー
-  // ==========================================
   function renderVirtualTourMenu(guestName, facilityName) {
-    let html = `
-      ${renderLangSelectorHtml()}
-      <h2>${t('virtualTour')}</h2>
-    `;
+    let html = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>' + t('virtualTour') + '</h2>\
+    ';
     
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      html += `<button class="btn btn-primary btn-vt" data-id="${facility.id}">${facility.name}</button>`;
+      html += '<button class="btn btn-primary btn-vt" data-id="' + facility.id + '">' + facility.name + '</button>';
     });
     
-    html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+    html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderVirtualTourMenu, guestName, facilityName);
 
@@ -307,30 +323,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', (e) => {
         const facilityId = e.target.getAttribute('data-id');
         const vtUrl = APP_CONFIG.virtualTourUrls[facilityId];
-        if(vtUrl) {
-          window.open(vtUrl, '_blank');
-        }
+        if(vtUrl) window.open(vtUrl, '_blank');
       });
     });
     
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(guestName, facilityName));
   }
 
-  // ==========================================
-  // 【階層③】アクションメニュー（チェックイン・アウト・アンケート等）
-  // ==========================================
   function renderGuestActionMenu(guestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
     
-    appContent.innerHTML = `
-      ${renderLangSelectorHtml()}
-      <h2>【${locFacName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
-      <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
-      <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
-      <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
-      <button class="btn btn-danger" id="btn-close">${t('closeApp')}</button>
-      <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
-    `;
+    appContent.innerHTML = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>【' + locFacName + '】<br>' + guestName + ' 様<br>----<br>' + t('selectGuestMenu') + '</h2>\
+      <button class="btn btn-primary" id="btn-checkinout">' + t('checkinout') + '</button>\
+      <button class="btn btn-primary" id="btn-survey">' + t('survey') + '</button>\
+      <button class="btn btn-primary" id="btn-contact">' + t('contact') + '</button>\
+      <button class="btn btn-danger" id="btn-close">' + t('closeApp') + '</button>\
+      <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
+    ';
     bindLangSelectorEvents(renderGuestActionMenu, guestName, facilityName);
 
     document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
@@ -345,17 +356,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCheckInOutAction(guestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
 
-    appContent.innerHTML = `
-      ${renderLangSelectorHtml()}
-      <h2>【${locFacName}】<br>${guestName} 様<br>${t('selectAction')}</h2>
-      <button class="btn btn-primary" id="btn-in">${t('checkInBtn')}</button>
-      <button class="btn btn-primary" id="btn-out">${t('checkOutBtn')}</button>
-      <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
-    `;
+    appContent.innerHTML = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>【' + locFacName + '】<br>' + guestName + ' 様<br>' + t('selectAction') + '</h2>\
+      <button class="btn btn-primary" id="btn-in">' + t('checkInBtn') + '</button>\
+      <button class="btn btn-primary" id="btn-out">' + t('checkOutBtn') + '</button>\
+      <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
+    ';
     bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
     
     const submitAction = async (actionText, actionLogText) => {
-      const confirmMsg = `【${locFacName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
+      const confirmMsg = '【' + locFacName + '】\n' + guestName + ' 様\n\n「' + actionText + '」\n\n' + t('confirmSend');
       if (!confirm(confirmMsg)) return;
       
       loading.innerText = t('loading');
@@ -371,9 +382,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             let msgWelcome = t('ci_msg_welcome');
             msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
             const msgSupport = t('ci_msg_support');
-            alert(`${msgWelcome}\n\n${msgSupport}`);
+            alert(msgWelcome + '\n\n' + msgSupport);
           } else {
-            alert(`ご登録の連絡先（OTAメッセージまたはお電話）にてスタッフからご案内いたします。`);
+            alert('ご登録の連絡先（OTAメッセージまたはお電話）にてスタッフからご案内いたします。');
           }
         } else {
           alert(t('sendSuccess'));
@@ -390,15 +401,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestContactCategory(guestName, facilityName) {
-    let html = `
-      ${renderLangSelectorHtml()}
-      <h2>${t('selectContactCat')}</h2>
-    `;
+    let html = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>' + t('selectContactCat') + '</h2>\
+    ';
     APP_CONFIG.contactCategories.forEach(cat => {
       const catName = t('cat_' + cat.key);
-      html += `<button class="btn btn-primary btn-cat" data-name="${catName}">${catName}</button>`;
+      html += '<button class="btn btn-primary btn-cat" data-name="' + catName + '">' + catName + '</button>';
     });
-    html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
+    html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderGuestContactCategory, guestName, facilityName);
@@ -413,13 +424,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestContactForm(guestName, facilityName, categoryName) {
-    appContent.innerHTML = `
-      ${renderLangSelectorHtml()}
-      <h2>${categoryName}</h2>
-      <textarea id="inquiry-text" class="input-field" placeholder="${t('inquiryPlaceholder')}"></textarea>
-      <button class="btn btn-primary" id="btn-send">${t('sendLine')}</button>
-      <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
-    `;
+    appContent.innerHTML = '\
+      ' + renderLangSelectorHtml() + '\
+      <h2>' + categoryName + '</h2>\
+      <textarea id="inquiry-text" class="input-field" placeholder="' + t('inquiryPlaceholder') + '"></textarea>\
+      <button class="btn btn-primary" id="btn-send">' + t('sendLine') + '</button>\
+      <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
+    ';
     bindLangSelectorEvents(renderGuestContactForm, guestName, facilityName, categoryName);
 
     document.getElementById('btn-send').addEventListener('click', async () => {
@@ -427,8 +438,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!text) return alert(t('inquiryAlert'));
       
       const locFacName = getLocalizedFacilityName(facilityName);
-      const messageToChat = `【${categoryName}】\n施設：${locFacName}\nお名前：${guestName} 様\n\n${text}`;
-      const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
+      const messageToChat = '【' + categoryName + '】\n施設：' + locFacName + '\nお名前：' + guestName + ' 様\n\n' + text;
+      const confirmMsg = t('confirmSend') + '\n\n' + messageToChat;
       if (!confirm(confirmMsg)) return;
 
       loading.innerText = t('loading');
@@ -447,9 +458,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
   }
 
-  // ==========================================
-  // 【共通】GAS通信用ユーティリティ
-  // ==========================================
   async function sendToGAS(type, facilityName, guestName, action, lang) {
     const payload = { channel: "ota", clientId: clientId, type, facilityName, guestName, action, detail: lang };
     try {
