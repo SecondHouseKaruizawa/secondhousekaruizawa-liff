@@ -266,7 +266,7 @@ const APP_CONFIG = {
       "authSubmit": "Verify & Proceed",
       "authError": "Matching reservation not found. Please check your selections.",
       "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later.",
-      "cotteNotice": "*If you booked via the 'Check Availability' button on our website, please select Cotte.",
+      "cotteNotice": "*If you booked via the 「空室情報はこちらから」 button on our website, please select Cotte.",
       "selectPlaceholder": "-- Please select --",
       "exitDebug": "Exit Auth Skip (Return to Normal)"
     },
@@ -322,7 +322,7 @@ const APP_CONFIG = {
       "guestTopMenuPrompt": "請選擇選單",
       "duringStay": "住宿期間選單<br><small>(入住登記・諮詢等)</small>",
       "routeAccess": "前往設施的路線導航",
-      "locationWarning": "※請請在開啟裝置定位服務後使用。",
+      "locationWarning": "※請在開啟裝置定位服務後使用。",
       "accessPrefix": "前往",
       "accessSuffix": "",
       "ci_msg_staff_contact": "關於住宿設施的導覽，稍後我們的工作人員將與您聯繫。",
@@ -340,7 +340,7 @@ const APP_CONFIG = {
       "authSubmit": "驗證並進入",
       "authError": "找不到相符的預訂資訊，請確認您的選擇內容。",
       "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。",
-      "cotteNotice": "※若透過官網「查詢空房」按鈕預訂，請選擇 Cotte。",
+      "cotteNotice": "※若透過官網「空室情報はこちらから」按鈕預訂，請選擇 Cotte。",
       "selectPlaceholder": "-- 請選擇 --",
       "exitDebug": "結束驗證略過 (恢復正常模式)"
     },
@@ -370,7 +370,7 @@ const APP_CONFIG = {
       "checkInBtn": "抵达・办理入住",
       "checkOutBtn": "离开・办理退房",
       "sendSuccess": "发送成功。",
-      "nameAlert": "请输入您的姓名。",
+      "nameAlignment": "请输入您的姓名。",
       "selectContactCat": "请选择您的咨询类别",
       "yourName": "您的姓名",
       "inquiryPlaceholder": "请输入您的问题...",
@@ -414,7 +414,7 @@ const APP_CONFIG = {
       "authSubmit": "验证并进入",
       "authError": "找不到相符的预订信息，请确认您的选择内容。",
       "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。",
-      "cotteNotice": "※若通过官网“查询空房”按钮预订，请选择 Cotte。",
+      "cotteNotice": "※若通过官网“空室情報はこちらから”按钮预订，请选择 Cotte。",
       "selectPlaceholder": "-- 请选择 --",
       "exitDebug": "结束验证略过 (恢复正常模式)"
     }
