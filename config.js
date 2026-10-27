@@ -194,7 +194,15 @@ const APP_CONFIG = {
       "authLocked": "認証失敗が続いたため、セキュリティ保護により一時的にアクセスを制限しています。しばらく経ってから再度お試しください。",
       "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
       "selectPlaceholder": "-- 選択してください --",
-      "exitDebug": "認証スキップ終了 (通常モードに戻す)"
+      "exitDebug": "認証スキップ終了 (通常モードに戻す)",
+      
+      // ▼ 新規追加の文言
+      "guestNamePromptTitle": "お客様のお名前を入力してください",
+      "guestNamePromptDesc": "(フルネームでなくても構いませんが、ホスト側で予約者様であることを特定できるものをご入力ください。)",
+      "guestNamePlaceholder": "お名前または識別名 (例: 山田)",
+      "guestNameNotice": "※こちらに記載いただくお名前はスタッフ向けの通知のみに利用され、データとして保存されることは一切ございません。(ご利用の端末のメモリに一時保存される可能性はございますが、当施設スタッフおよび第三者が参照することは仕組み上出来ません。)",
+      "honorific": "様",
+      "privacyNotice": "※本サイトでは、入力・選択いただく情報の記録・保持は一切しておらず、また個人を特定可能なデータをシステムとして保有することもしておりません。"
     },
     "en": {
       "loading": "Loading system...",
@@ -266,9 +274,17 @@ const APP_CONFIG = {
       "authSubmit": "Verify & Proceed",
       "authError": "Matching reservation not found. Please check your selections.",
       "authLocked": "Access is temporarily restricted due to multiple failed verification attempts. Please try again later.",
-      "cotteNotice": "*If you booked via the 「空室情報はこちらから」 button on our website, please select Cotte.",
+      "cotteNotice": "*If you booked via the '空室情報はこちらから' button on our website, please select Cotte.",
       "selectPlaceholder": "-- Please select --",
-      "exitDebug": "Exit Auth Skip (Return to Normal)"
+      "exitDebug": "Exit Auth Skip (Return to Normal)",
+
+      // ▼ 新規追加の文言
+      "guestNamePromptTitle": "Please enter your name",
+      "guestNamePromptDesc": "(It does not have to be your full name, but please enter something that helps the host identify your reservation.)",
+      "guestNamePlaceholder": "Your name or identifier (e.g., John)",
+      "guestNameNotice": "*The name provided here is used solely for staff notifications and is never stored as data. (While it may be temporarily cached in your device's memory, by design, neither our staff nor any third parties can access or retain it.)",
+      "honorific": "Mr./Ms.",
+      "privacyNotice": "*This site does not record or retain any information entered or selected, nor does it hold any personally identifiable data within the system."
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -342,7 +358,15 @@ const APP_CONFIG = {
       "authLocked": "由於多次驗證失敗，為保護安全性已暫時限制存取。請稍後再試。",
       "cotteNotice": "※若透過官網「空室情報はこちらから」按鈕預訂，請選擇 Cotte。",
       "selectPlaceholder": "-- 請選擇 --",
-      "exitDebug": "結束驗證略過 (恢復正常模式)"
+      "exitDebug": "結束驗證略過 (恢復正常模式)",
+
+      // ▼ 新規追加の文言
+      "guestNamePromptTitle": "請輸入您的姓名",
+      "guestNamePromptDesc": "(不一定是全名即可，但請輸入能讓房東識別您預訂身分的資訊。)",
+      "guestNamePlaceholder": "姓名或識別名 (例: 王小明)",
+      "guestNameNotice": "※在此處填寫的姓名僅用於通知工作人員，絕不會作為資料儲存。（雖然可能會暫時儲存在您裝置的記憶體中，但按系統機制，本設施工作人員及第三方均無法存取或查閱。）",
+      "honorific": "先生/女士",
+      "privacyNotice": "※本網站不會記錄或保留任何輸入或選擇的資訊，亦不在系統內保留任何可識別個人身分的資料。"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -370,7 +394,7 @@ const APP_CONFIG = {
       "checkInBtn": "抵达・办理入住",
       "checkOutBtn": "离开・办理退房",
       "sendSuccess": "发送成功。",
-      "nameAlignment": "请输入您的姓名。",
+      "nameAlert": "请输入您的姓名。",
       "selectContactCat": "请选择您的咨询类别",
       "yourName": "您的姓名",
       "inquiryPlaceholder": "请输入您的问题...",
@@ -405,7 +429,7 @@ const APP_CONFIG = {
       "ci_msg_welcome": "欢迎来到 {facility}！我们已收到 {name} 贵宾的入住办理。",
       "ci_msg_support": "若对于设施使用或备品有任何疑问，请随时与我们联系。",
       "maintTitle": "系统维护中",
-      "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请见諒，请稍后再试。",
+      "maintMsg": "系统目前正在进行维护。<br>造成您的不便敬请見諒，请稍后再试。",
       "authPrompt": "请选择您的预订信息",
       "checkInDate": "入住日期",
       "nights": "住宿晚数",
@@ -416,7 +440,15 @@ const APP_CONFIG = {
       "authLocked": "由于多次验证失败，为保护安全性已暂时限制访问。请稍后再试。",
       "cotteNotice": "※若通过官网“空室情報はこちらから”按钮预订，请选择 Cotte。",
       "selectPlaceholder": "-- 请选择 --",
-      "exitDebug": "结束验证略过 (恢复正常模式)"
+      "exitDebug": "结束验证略过 (恢复正常模式)",
+
+      // ▼ 新規追加の文言
+      "guestNamePromptTitle": "请输入您的姓名",
+      "guestNamePromptDesc": "(不一定是全名即可，但请输入能让房东识别您预订身份的信息。)",
+      "guestNamePlaceholder": "姓名或识别名 (例: 张三)",
+      "guestNameNotice": "※在此处填写的姓名仅用于通知工作人员，绝不会作为数据保存。（虽然可能会暂时存储在您设备的内存中，但按系统机制，本设施工作人员及第三方均无法访问或查阅。）",
+      "honorific": "先生/女士",
+      "privacyNotice": "※本网站不会记录或保留任何输入或选择的信息，亦不在系统内保留任何可识别个人身份的资料。"
     }
   }
 };
