@@ -19,6 +19,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     return key;
   }
 
+  // 選択中の言語に応じた敬称付き表示名を生成
+  function formatGuestDisplayName(rawName) {
+    if (!rawName) return "";
+    const formatStr = t('honorificFormat') || "{name}";
+    return formatStr.replace('{name}', rawName);
+  }
+
   function getLocalizedFacilityName(name) {
     let facId = null;
     for (const lang in APP_CONFIG.facilities) {
@@ -283,6 +290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // ゲスト名（識別名）入力画面
   function renderGuestNameInputStep(facilityName) {
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
@@ -305,15 +313,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!nameInput) {
         return alert(t('nameAlert'));
       }
-      const formatStr = t('honorificFormat');
-      const guestDisplayName = formatStr.replace('{name}', nameInput);
-      renderGuestTopMenu(guestDisplayName, facilityName);
+      // 生の名前（rawGuestName）を保持してTOP画面へ
+      renderGuestTopMenu(nameInput, facilityName);
     });
 
     document.getElementById('btn-back-auth').addEventListener('click', renderOtaAuthForm);
   }
 
-  function renderGuestTopMenu(guestName, facilityName) {
+  // ゲストTOPメニュー（rawGuestName を保持して動的フォーマット）
+  function renderGuestTopMenu(rawGuestName, facilityName) {
     const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
 
     let debugExitBtnHtml = '';
@@ -321,9 +329,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       debugExitBtnHtml = '<button class="btn btn-danger" id="btn-exit-debug" style="background-color: #d9534f; margin-top: 15px;">' + t('exitDebug') + '</button>';
     }
 
+    const guestDisplayName = formatGuestDisplayName(rawGuestName);
+
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + getLocalizedFacilityName(facilityName) + '】<br>' + guestName + '<br>----<br>' + t('guestTopMenuPrompt') + '</h2>\
+      <h2>【' + getLocalizedFacilityName(facilityName) + '】<br>' + guestDisplayName + '<br>----<br>' + t('guestTopMenuPrompt') + '</h2>\
       <button class="btn btn-primary" id="btn-during-stay">' + t('duringStay') + '</button>\
       <button class="btn btn-primary" id="btn-route-access">' + t('routeAccess') + '</button>\
       <button class="btn btn-primary" id="btn-virtual-tour-guest">' + t('virtualTour') + '</button>\
@@ -334,11 +344,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         ' + t('privacyNotice') + '\
       </div>\
     ';
-    bindLangSelectorEvents(renderGuestTopMenu, guestName, facilityName);
+    bindLangSelectorEvents(renderGuestTopMenu, rawGuestName, facilityName);
 
-    document.getElementById('btn-during-stay').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
-    document.getElementById('btn-route-access').addEventListener('click', () => renderRouteAccessMenu(guestName, facilityName));
-    document.getElementById('btn-virtual-tour-guest').addEventListener('click', () => renderVirtualTourMenu(guestName, facilityName));
+    document.getElementById('btn-during-stay').addEventListener('click', () => renderGuestActionMenu(rawGuestName, facilityName));
+    document.getElementById('btn-route-access').addEventListener('click', () => renderRouteAccessMenu(rawGuestName, facilityName));
+    document.getElementById('btn-virtual-tour-guest').addEventListener('click', () => renderVirtualTourMenu(rawGuestName, facilityName));
     document.getElementById('btn-back').addEventListener('click', renderOtaAuthForm);
 
     if (isDebugActive) {
@@ -350,7 +360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function renderRouteAccessMenu(guestName, facilityName) {
+  function renderRouteAccessMenu(rawGuestName, facilityName) {
     let html = '\
       ' + renderLangSelectorHtml() + '\
       <h2>' + t('routeAccess') + '</h2>\
@@ -367,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
-    bindLangSelectorEvents(renderRouteAccessMenu, guestName, facilityName);
+    bindLangSelectorEvents(renderRouteAccessMenu, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-map').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -377,10 +387,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
     
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
-  function renderVirtualTourMenu(guestName, facilityName) {
+  function renderVirtualTourMenu(rawGuestName, facilityName) {
     let html = '\
       ' + renderLangSelectorHtml() + '\
       <h2>' + t('virtualTour') + '</h2>\
@@ -393,7 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
-    bindLangSelectorEvents(renderVirtualTourMenu, guestName, facilityName);
+    bindLangSelectorEvents(renderVirtualTourMenu, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-vt').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -403,52 +413,54 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
     
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
-  function renderGuestActionMenu(guestName, facilityName) {
+  function renderGuestActionMenu(rawGuestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
+    const guestDisplayName = formatGuestDisplayName(rawGuestName);
     
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + locFacName + '】<br>' + guestName + '<br>----<br>' + t('selectGuestMenu') + '</h2>\
+      <h2>【' + locFacName + '】<br>' + guestDisplayName + '<br>----<br>' + t('selectGuestMenu') + '</h2>\
       <button class="btn btn-primary" id="btn-checkinout">' + t('checkinout') + '</button>\
       <button class="btn btn-primary" id="btn-survey">' + t('survey') + '</button>\
       <button class="btn btn-primary" id="btn-contact">' + t('contact') + '</button>\
       <button class="btn btn-danger" id="btn-close">' + t('closeApp') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
-    bindLangSelectorEvents(renderGuestActionMenu, guestName, facilityName);
+    bindLangSelectorEvents(renderGuestActionMenu, rawGuestName, facilityName);
 
-    document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
+    document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(rawGuestName, facilityName));
     document.getElementById('btn-survey').addEventListener('click', () => {
       window.open(APP_CONFIG.surveyUrls[currentLang] || APP_CONFIG.surveyUrls['ja'], '_blank');
     });
-    document.getElementById('btn-contact').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
+    document.getElementById('btn-contact').addEventListener('click', () => renderGuestContactCategory(rawGuestName, facilityName));
     document.getElementById('btn-close').addEventListener('click', closeApp);
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
-  function renderCheckInOutAction(guestName, facilityName) {
+  function renderCheckInOutAction(rawGuestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
+    const guestDisplayName = formatGuestDisplayName(rawGuestName);
 
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + locFacName + '】<br>' + guestName + '<br>' + t('selectAction') + '</h2>\
+      <h2>【' + locFacName + '】<br>' + guestDisplayName + '<br>' + t('selectAction') + '</h2>\
       <button class="btn btn-primary" id="btn-in">' + t('checkInBtn') + '</button>\
       <button class="btn btn-primary" id="btn-out">' + t('checkOutBtn') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
-    bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
+    bindLangSelectorEvents(renderCheckInOutAction, rawGuestName, facilityName);
     
     const submitAction = async (actionText, actionLogText) => {
-      const confirmMsg = '【' + locFacName + '】\n' + guestName + '\n\n「' + actionText + '」\n\n' + t('confirmSend');
+      const confirmMsg = '【' + locFacName + '】\n' + guestDisplayName + '\n\n「' + actionText + '」\n\n' + t('confirmSend');
       if (!confirm(confirmMsg)) return;
       
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
-      const success = await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang);
+      const success = await sendToGAS("guest", facilityName, rawGuestName, actionLogText, currentLang);
       
       loading.classList.add('hidden');
       if (success) {
@@ -456,7 +468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
+            msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestDisplayName);
             const msgSupport = t('ci_msg_support');
             alert(msgWelcome + '\n\n' + msgSupport);
           } else {
@@ -465,7 +477,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           alert(t('sendSuccess'));
         }
-        renderGuestActionMenu(guestName, facilityName);
+        renderGuestActionMenu(rawGuestName, facilityName);
       } else {
         alert(t('sendFail'));
       }
@@ -473,10 +485,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-in').addEventListener('click', () => submitAction(t('checkInBtn'), '到着・チェックイン(Checked-In)'));
     document.getElementById('btn-out').addEventListener('click', () => submitAction(t('checkOutBtn'), '出発・チェックアウト(Checked-Out)'));
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(rawGuestName, facilityName));
   }
 
-  function renderGuestContactCategory(guestName, facilityName) {
+  function renderGuestContactCategory(rawGuestName, facilityName) {
     let html = '\
       ' + renderLangSelectorHtml() + '\
       <h2>' + t('selectContactCat') + '</h2>\
@@ -488,18 +500,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     
     appContent.innerHTML = html;
-    bindLangSelectorEvents(renderGuestContactCategory, guestName, facilityName);
+    bindLangSelectorEvents(renderGuestContactCategory, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-cat').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const categoryName = e.target.getAttribute('data-name');
-        renderGuestContactForm(guestName, facilityName, categoryName);
+        renderGuestContactForm(rawGuestName, facilityName, categoryName);
       });
     });
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(rawGuestName, facilityName));
   }
 
-  function renderGuestContactForm(guestName, facilityName, categoryName) {
+  function renderGuestContactForm(rawGuestName, facilityName, categoryName) {
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
       <h2>' + categoryName + '</h2>\
@@ -507,31 +519,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button class="btn btn-primary" id="btn-send">' + t('sendToStaff') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
-    bindLangSelectorEvents(renderGuestContactForm, guestName, facilityName, categoryName);
+    bindLangSelectorEvents(renderGuestContactForm, rawGuestName, facilityName, categoryName);
 
     document.getElementById('btn-send').addEventListener('click', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
       
       const locFacName = getLocalizedFacilityName(facilityName);
-      const messageToChat = '【' + categoryName + '】\n施設：' + locFacName + '\nお名前：' + guestName + '\n\n' + text;
+      const messageToChat = '【' + categoryName + '】\n施設：' + locFacName + '\nお名前：' + rawGuestName + ' 様\n\n' + text;
       const confirmMsg = t('confirmSend') + '\n\n' + messageToChat;
       if (!confirm(confirmMsg)) return;
 
       loading.innerText = t('loading');
-      loading.classList.add('hidden');
-      const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: guestName, message: text });
+      loading.classList.remove('hidden');
+      const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: rawGuestName, message: text });
       loading.classList.add('hidden');
 
       if (success) {
         alert(t('pcFallbackSuccess'));
-        renderGuestActionMenu(guestName, facilityName);
+        renderGuestActionMenu(rawGuestName, facilityName);
       } else {
         alert(t('sendFail'));
       }
     });
 
-    document.getElementById('btn-back').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
+    document.getElementById('btn-back').addEventListener('click', () => renderGuestContactCategory(rawGuestName, facilityName));
   }
 
   async function sendToGAS(type, facilityName, guestName, action, lang) {
