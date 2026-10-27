@@ -35,6 +35,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     return name;
   }
 
+  // 多言語の選択肢から照合用の基準施設名（日本語名称）に変換するヘルパー
+  function getCanonicalFacilityName(localizedName) {
+    if (!localizedName) return "";
+    for (const lang in APP_CONFIG.facilities) {
+      const found = APP_CONFIG.facilities[lang].find(f => f.name === localizedName);
+      if (found) {
+        const jaFac = APP_CONFIG.facilities['ja'].find(f => f.id === found.id);
+        if (jaFac) return jaFac.name;
+      }
+    }
+    return localizedName;
+  }
+
+  // 多言語の選択肢から照合用の基準予約経路名（日本語名称）に変換するヘルパー
+  function getCanonicalChannelName(localizedName) {
+    if (!localizedName) return "";
+    for (const lang in APP_CONFIG.bookingChannels) {
+      const found = APP_CONFIG.bookingChannels[lang].find(c => c.name === localizedName);
+      if (found) {
+        const jaChan = APP_CONFIG.bookingChannels['ja'].find(c => c.id === found.id);
+        if (jaChan) return jaChan.name;
+      }
+    }
+    return localizedName;
+  }
+
   function renderLangSelectorHtml() {
     return '\
       <div class="lang-selector">\
@@ -198,15 +224,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       const adults = document.getElementById('auth-adults').value;
       const channel = document.getElementById('auth-channel').value;
 
-      // ▼ 【デバッグトリガー判定】チェックイン日 "1991-05-25" ＆ 予約経路 "その他" なら、他の項目が未選択でもバリデーションをスルー
-      const isDebugAttempt = (checkinDate === "1991-05-25") && (channel === "その他" || channel === "Other" || channel === "其他" || channel === "其它");
+      // 予約経路・施設名を日本語の基準名称に正規化
+      const canonicalFacility = getCanonicalFacilityName(facility);
+      const canonicalChannel = getCanonicalChannelName(channel);
+
+      // ▼ 【デバッグトリガー判定】チェックイン日 "1991-05-25" ＆ 予約経路 "その他" なら未選択項目があってもスルー
+      const isDebugAttempt = (checkinDate === "1991-05-25") && (canonicalChannel === "その他");
 
       if (!isDebugAttempt && (!checkinDate || !facility || !nights || !adults || !channel)) {
         return alert(t('validationAlert'));
       }
 
       // 未選択項目のフォールバック（デバッグ時用）
-      const finalFacility = facility || APP_CONFIG.facilities['ja'][0].name;
+      const finalFacility = canonicalFacility || APP_CONFIG.facilities['ja'][0].name;
       const finalNights = nights || "1";
       const finalAdults = adults || "1";
 
@@ -226,7 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               facility: finalFacility, 
               nights: finalNights, 
               adults: finalAdults, 
-              channel: channel 
+              channel: canonicalChannel 
             }
           })
         });
@@ -441,7 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ' + renderLangSelectorHtml() + '\
       <h2>' + categoryName + '</h2>\
       <textarea id="inquiry-text" class="input-field" placeholder="' + t('inquiryPlaceholder') + '"></textarea>\
-      <button class="btn btn-primary" id="btn-send">' + t('sendLine') + '</button>\
+      <button class="btn btn-primary" id="btn-send">' + t('sendToStaff') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
     bindLangSelectorEvents(renderGuestContactForm, guestName, facilityName, categoryName);
