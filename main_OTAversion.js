@@ -35,7 +35,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return name;
   }
 
-  // 多言語の選択肢から照合用の基準施設名（日本語名称）に変換するヘルパー
   function getCanonicalFacilityName(localizedName) {
     if (!localizedName) return "";
     for (const lang in APP_CONFIG.facilities) {
@@ -48,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return localizedName;
   }
 
-  // 多言語の選択肢から照合用の基準予約経路名（日本語名称）に変換するヘルパー
   function getCanonicalChannelName(localizedName) {
     if (!localizedName) return "";
     for (const lang in APP_CONFIG.bookingChannels) {
@@ -172,25 +170,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('selectFacility') + '</label>\
       <select id="auth-facility" class="input-field">\
-        <option value="" disabled selected>-- 選択してください --</option>\
+        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
         ' + facilityOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('nights') + '</label>\
       <select id="auth-nights" class="input-field">\
-        <option value="" disabled selected>-- 選択してください --</option>\
+        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
         ' + nightOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('adults') + '</label>\
       <select id="auth-adults" class="input-field">\
-        <option value="" disabled selected>-- 選択してください --</option>\
+        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
         ' + adultOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('channel') + '</label>\
       <select id="auth-channel" class="input-field" title="' + t('cotteNotice') + '">\
-        <option value="" disabled selected>-- 選択してください --</option>\
+        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
         ' + channelOptions + '\
       </select>\
       <div id="cotte-notice-box" style="font-size: 12px; color: #d9534f; margin-top: -10px; margin-bottom: 15px; font-weight: bold; line-height: 1.4;">\
@@ -224,18 +222,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const adults = document.getElementById('auth-adults').value;
       const channel = document.getElementById('auth-channel').value;
 
-      // 予約経路・施設名を日本語の基準名称に正規化
       const canonicalFacility = getCanonicalFacilityName(facility);
       const canonicalChannel = getCanonicalChannelName(channel);
 
-      // ▼ 【デバッグトリガー判定】チェックイン日 "1991-05-25" ＆ 予約経路 "その他" なら未選択項目があってもスルー
       const isDebugAttempt = (checkinDate === "1991-05-25") && (canonicalChannel === "その他");
 
       if (!isDebugAttempt && (!checkinDate || !facility || !nights || !adults || !channel)) {
         return alert(t('validationAlert'));
       }
 
-      // 未選択項目のフォールバック（デバッグ時用）
       const finalFacility = canonicalFacility || APP_CONFIG.facilities['ja'][0].name;
       const finalNights = nights || "1";
       const finalAdults = adults || "1";
