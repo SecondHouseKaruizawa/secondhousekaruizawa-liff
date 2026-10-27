@@ -195,14 +195,14 @@ const APP_CONFIG = {
       "cotteNotice": "※HPの「空室情報はこちらから」ボタンを経由した場合はCotteを選択ください。",
       "selectPlaceholder": "-- 選択してください --",
       "exitDebug": "認証スキップ終了 (通常モードに戻す)",
-      
-      // ▼ 新規追加の文言
+
       "guestNamePromptTitle": "お客様のお名前を入力してください",
       "guestNamePromptDesc": "(フルネームでなくても構いませんが、ホスト側で予約者様であることを特定できるものをご入力ください。)",
       "guestNamePlaceholder": "お名前または識別名 (例: 山田)",
       "guestNameNotice": "※こちらに記載いただくお名前はスタッフ向けの通知のみに利用され、データとして保存されることは一切ございません。(ご利用の端末のメモリに一時保存される可能性はございますが、当施設スタッフおよび第三者が参照することは仕組み上出来ません。)",
-      "honorific": "様",
-      "privacyNotice": "※本サイトでは、入力・選択いただく情報の記録・保持は一切しておらず、また個人を特定可能なデータをシステムとして保有することもしておりません。"
+      "honorificFormat": "{name} 様",
+      "privacyNotice": "※本サイトでは、入力・選択いただく情報の記録・保持は一切しておらず、また個人を特定可能なデータをシステムとして保有することもしておりません。",
+      "backToAuth": "認証画面へ戻る"
     },
     "en": {
       "loading": "Loading system...",
@@ -278,13 +278,13 @@ const APP_CONFIG = {
       "selectPlaceholder": "-- Please select --",
       "exitDebug": "Exit Auth Skip (Return to Normal)",
 
-      // ▼ 新規追加の文言
       "guestNamePromptTitle": "Please enter your name",
       "guestNamePromptDesc": "(It does not have to be your full name, but please enter something that helps the host identify your reservation.)",
       "guestNamePlaceholder": "Your name or identifier (e.g., John)",
       "guestNameNotice": "*The name provided here is used solely for staff notifications and is never stored as data. (While it may be temporarily cached in your device's memory, by design, neither our staff nor any third parties can access or retain it.)",
-      "honorific": "Mr./Ms.",
-      "privacyNotice": "*This site does not record or retain any information entered or selected, nor does it hold any personally identifiable data within the system."
+      "honorificFormat": "Mr./Ms. {name}",
+      "privacyNotice": "*This site does not record or retain any information entered or selected, nor does it hold any personally identifiable data within the system.",
+      "backToAuth": "Back to Verification"
     },
     "zh-TW": {
       "loading": "系統載入中...",
@@ -360,13 +360,13 @@ const APP_CONFIG = {
       "selectPlaceholder": "-- 請選擇 --",
       "exitDebug": "結束驗證略過 (恢復正常模式)",
 
-      // ▼ 新規追加の文言
       "guestNamePromptTitle": "請輸入您的姓名",
       "guestNamePromptDesc": "(不一定是全名即可，但請輸入能讓房東識別您預訂身分的資訊。)",
       "guestNamePlaceholder": "姓名或識別名 (例: 王小明)",
       "guestNameNotice": "※在此處填寫的姓名僅用於通知工作人員，絕不會作為資料儲存。（雖然可能會暫時儲存在您裝置的記憶體中，但按系統機制，本設施工作人員及第三方均無法存取或查閱。）",
-      "honorific": "先生/女士",
-      "privacyNotice": "※本網站不會記錄或保留任何輸入或選擇的資訊，亦不在系統內保留任何可識別個人身分的資料。"
+      "honorificFormat": "{name} 先生/女士",
+      "privacyNotice": "※本網站不會記錄或保留任何輸入或選擇的資訊，亦不在系統內保留任何可識別個人身分的資料。",
+      "backToAuth": "返回驗證畫面"
     },
     "zh-CN": {
       "loading": "系统加载中...",
@@ -442,13 +442,13 @@ const APP_CONFIG = {
       "selectPlaceholder": "-- 请选择 --",
       "exitDebug": "结束验证略过 (恢复正常模式)",
 
-      // ▼ 新規追加の文言
       "guestNamePromptTitle": "请输入您的姓名",
       "guestNamePromptDesc": "(不一定是全名即可，但请输入能让房东识别您预订身份的信息。)",
       "guestNamePlaceholder": "姓名或识别名 (例: 张三)",
       "guestNameNotice": "※在此处填写的姓名仅用于通知工作人员，绝不会作为数据保存。（虽然可能会暂时存储在您设备的内存中，但按系统机制，本设施工作人员及第三方均无法访问或查阅。）",
-      "honorific": "先生/女士",
-      "privacyNotice": "※本网站不会记录或保留任何输入或选择的信息，亦不在系统内保留任何可识别个人身份的资料。"
+      "honorificFormat": "{name} 先生/女士",
+      "privacyNotice": "※本网站不会记录或保留任何输入或选择的信息，亦不在系统内保留任何可识别个人身份的资料。",
+      "backToAuth": "返回验证画面"
     }
   }
 };

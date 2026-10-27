@@ -269,7 +269,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('ota_debug_skip', 'true');
             alert("【デバッグモード】認証スキップを有効化しました。");
           }
-          // 認証成功後、ゲスト識別名入力ステップへ進む
           renderGuestNameInputStep(finalFacility);
         } else if (result.status === "locked") {
           renderLockedScreen(result.message || t('authLocked'));
@@ -284,7 +283,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ▼ 【新設】認証成功直後のゲスト名（識別名）入力ステップ
   function renderGuestNameInputStep(facilityName) {
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
@@ -298,7 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>\
       \
       <button class="btn btn-primary" id="btn-submit-name">' + t('next') + '</button>\
-      <button class="btn btn-secondary" id="btn-back-auth">' + t('back') + '</button>\
+      <button class="btn btn-secondary" id="btn-back-auth">' + t('backToAuth') + '</button>\
     ';
     bindLangSelectorEvents(renderGuestNameInputStep, facilityName);
 
@@ -307,8 +305,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!nameInput) {
         return alert(t('nameAlert'));
       }
-      const honorific = t('honorific');
-      const guestDisplayName = nameInput + ' ' + honorific;
+      const formatStr = t('honorificFormat');
+      const guestDisplayName = formatStr.replace('{name}', nameInput);
       renderGuestTopMenu(guestDisplayName, facilityName);
     });
 
@@ -329,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button class="btn btn-primary" id="btn-during-stay">' + t('duringStay') + '</button>\
       <button class="btn btn-primary" id="btn-route-access">' + t('routeAccess') + '</button>\
       <button class="btn btn-primary" id="btn-virtual-tour-guest">' + t('virtualTour') + '</button>\
-      <button class="btn btn-secondary" id="btn-back">認証画面へ戻る</button>\
+      <button class="btn btn-secondary" id="btn-back">' + t('backToAuth') + '</button>\
       ' + debugExitBtnHtml + '\
       \
       <div style="font-size: 11px; color: #666; margin-top: 25px; line-height: 1.5; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">\
@@ -555,8 +553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = await response.text();
       if (text === "Error") return false;
       return true;
-    }
-    catch (e) {
+    } catch (e) {
       return false;
     }
   }
