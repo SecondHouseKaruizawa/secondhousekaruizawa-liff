@@ -313,14 +313,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!nameInput) {
         return alert(t('nameAlert'));
       }
-      // 生の名前（rawGuestName）を保持してTOP画面へ
       renderGuestTopMenu(nameInput, facilityName);
     });
 
     document.getElementById('btn-back-auth').addEventListener('click', renderOtaAuthForm);
   }
 
-  // ゲストTOPメニュー（rawGuestName を保持して動的フォーマット）
+  // ゲストTOPメニュー
   function renderGuestTopMenu(rawGuestName, facilityName) {
     const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
 
@@ -440,6 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
+  // ★ チェックイン・チェックアウト処理（完全多言語対応化）
   function renderCheckInOutAction(rawGuestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
     const guestDisplayName = formatGuestDisplayName(rawGuestName);
@@ -472,10 +472,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const msgSupport = t('ci_msg_support');
             alert(msgWelcome + '\n\n' + msgSupport);
           } else {
-            alert('ご登録の連絡先（OTAメッセージまたはお電話）にてスタッフからご案内いたします。');
+            // ★ kukka / LUONTO のチェックイン完了時ポップアップ（多言語対応）
+            alert(t('ci_msg_contact_direct'));
           }
         } else {
-          alert(t('sendSuccess'));
+          // ★ チェックアウト完了時ポップアップ（多言語対応）
+          alert(t('co_msg_success'));
         }
         renderGuestActionMenu(rawGuestName, facilityName);
       } else {
