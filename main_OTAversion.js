@@ -4,11 +4,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appContent = document.getElementById('app-content');
 
   let currentLang = localStorage.getItem('ota_app_lang') || 'ja';
-  
+
   let clientId = localStorage.getItem('ota_client_id');
   if (!clientId) {
     clientId = 'client_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     localStorage.setItem('ota_client_id', clientId);
+  }
+
+  // 管理者バイパスURL（?admin_key=...）の受け取りとsessionStorageへの退避（URL欄からは即時消去）
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlAdminKey = urlParams.get('admin_key');
+  if (urlAdminKey) {
+    sessionStorage.setItem('ota_admin_key', urlAdminKey);
+    urlParams.delete('admin_key');
+    const newSearch = urlParams.toString();
+    const cleanUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+  const adminKey = sessionStorage.getItem('ota_admin_key') || '';
+
+  // 旧バージョンのデバッグ用キーが残っている場合はクリーンアップ
+  localStorage.removeItem('ota_debug_skip');
+
+  // 署名付きセッショントークンの管理（チェックアウト翌日いっぱい有効・氏名は一切保存しない）
+  let otaToken = localStorage.getItem('ota_auth_token') || '';
+
+  function saveOtaToken(token) {
+    otaToken = token || '';
+    if (otaToken) {
+      localStorage.setItem('ota_auth_token', otaToken);
+    } else {
+      localStorage.removeItem('ota_auth_token');
+    }
+  }
+
+  // XSS・表示崩れ防止用HTMLエスケープ関数
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function t(key) {
@@ -19,11 +57,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     return key;
   }
 
-  // 選択中の言語に応じた敬称付き表示名を生成
+  // 選択中の言語に応じた敬称付き表示名を生成（生の文字列）
   function formatGuestDisplayName(rawName) {
     if (!rawName) return "";
     const formatStr = t('honorificFormat') || "{name}";
-    return formatStr.replace('{name}', rawName);
+    return formatStr.replace('{name}', () => rawName);
   }
 
   function getLocalizedFacilityName(name) {
@@ -95,7 +133,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const response = await fetch(APP_CONFIG.GAS_URL, {
       method: 'POST',
-      body: JSON.stringify({ channel: "ota", type: 'check_status', clientId: clientId })
+      body: JSON.stringify({
+        channel: "ota",
+        type: 'check_status',
+        clientId: clientId,
+        otaToken: otaToken,
+        adminKey: adminKey
+      })
     });
     const result = await response.json();
 
@@ -103,10 +147,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContent.classList.remove('hidden');
 
     if (result.isLocked) {
-      renderLockedScreen(result.lockMessage || t('authLocked'));
+      renderLockedScreen(result.message || result.lockMessage || t('authLocked'));
     } else if (result.isMaintenance) {
       renderMaintenanceScreen();
+    } else if (result.authenticatedFacility) {
+      // 有効な署名トークンを保持している場合は5項目選択をスキップして名前入力画面へ直行
+      renderGuestNameInputStep(result.authenticatedFacility);
     } else {
+      if (otaToken) saveOtaToken('');
       renderOtaAuthForm();
     }
   } catch (error) {
@@ -119,7 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContent.innerHTML = '\
       <div style="text-align: center; padding: 20px;">\
         <h2>🔒 セキュリティ制限</h2>\
-        <p style="font-size: 14px; line-height: 1.6; margin-top: 20px; color: #ff4d4f;">' + msg + '</p>\
+        <p style="font-size: 14px; line-height: 1.6; margin-top: 20px; color: #ff4d4f;">' + escapeHtml(msg) + '</p>\
         <button class="btn btn-secondary" id="btn-reload" style="margin-top: 30px;">再読み込み</button>\
       </div>\
     ';
@@ -140,22 +188,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderOtaAuthForm() {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
-    if (isDebugActive) {
-      renderGuestNameInputStep(APP_CONFIG.facilities['ja'][0].name);
-      return;
-    }
-
     let facilityOptions = '';
     const facilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     facilities.forEach(f => {
-      facilityOptions += '<option value="' + f.name + '">' + f.name + '</option>';
+      facilityOptions += '<option value="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</option>';
     });
 
     let channelOptions = '';
     const channels = APP_CONFIG.bookingChannels[currentLang] || APP_CONFIG.bookingChannels['ja'];
     channels.forEach(c => {
-      channelOptions += '<option value="' + c.name + '">' + c.name + '</option>';
+      channelOptions += '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>';
     });
 
     let nightOptions = '';
@@ -177,25 +219,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('selectFacility') + '</label>\
       <select id="auth-facility" class="input-field">\
-        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
+        <option value="" disabled selected>' + escapeHtml(t('selectPlaceholder')) + '</option>\
         ' + facilityOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('nights') + '</label>\
       <select id="auth-nights" class="input-field">\
-        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
+        <option value="" disabled selected>' + escapeHtml(t('selectPlaceholder')) + '</option>\
         ' + nightOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('adults') + '</label>\
       <select id="auth-adults" class="input-field">\
-        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
+        <option value="" disabled selected>' + escapeHtml(t('selectPlaceholder')) + '</option>\
         ' + adultOptions + '\
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('channel') + '</label>\
-      <select id="auth-channel" class="input-field" title="' + t('cotteNotice') + '">\
-        <option value="" disabled selected>' + t('selectPlaceholder') + '</option>\
+      <select id="auth-channel" class="input-field" title="' + escapeHtml(t('cotteNotice')) + '">\
+        <option value="" disabled selected>' + escapeHtml(t('selectPlaceholder')) + '</option>\
         ' + channelOptions + '\
       </select>\
       <div id="cotte-notice-box" style="font-size: 12px; color: #d9534f; margin-top: -10px; margin-bottom: 15px; font-weight: bold; line-height: 1.4;">\
@@ -233,18 +275,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const adults = document.getElementById('auth-adults').value;
       const channel = document.getElementById('auth-channel').value;
 
-      const canonicalFacility = getCanonicalFacilityName(facility);
-      const canonicalChannel = getCanonicalChannelName(channel);
-
-      const isDebugAttempt = (checkinDate === "1991-05-25") && (canonicalChannel === "その他");
-
-      if (!isDebugAttempt && (!checkinDate || !facility || !nights || !adults || !channel)) {
+      if (!checkinDate || !facility || !nights || !adults || !channel) {
         return alert(t('validationAlert'));
       }
 
-      const finalFacility = canonicalFacility || APP_CONFIG.facilities['ja'][0].name;
-      const finalNights = nights || "1";
-      const finalAdults = adults || "1";
+      const canonicalFacility = getCanonicalFacilityName(facility);
+      const canonicalChannel = getCanonicalChannelName(channel);
 
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
@@ -257,12 +293,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             channel: "ota",
             type: "authenticate",
             clientId: clientId,
-            data: { 
-              checkinDate: checkinDate, 
-              facility: finalFacility, 
-              nights: finalNights, 
-              adults: finalAdults, 
-              channel: canonicalChannel 
+            adminKey: adminKey,
+            data: {
+              checkinDate: checkinDate,
+              facility: canonicalFacility,
+              nights: nights,
+              adults: adults,
+              channel: canonicalChannel
             }
           })
         });
@@ -272,13 +309,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         appContent.classList.remove('hidden');
 
         if (result.status === "success") {
-          if (result.isDebugTrigger) {
-            localStorage.setItem('ota_debug_skip', 'true');
-            alert("【デバッグモード】認証スキップを有効化しました。");
-          }
-          renderGuestNameInputStep(finalFacility);
+          saveOtaToken(result.otaToken || '');
+          renderGuestNameInputStep(result.facility || canonicalFacility);
         } else if (result.status === "locked") {
           renderLockedScreen(result.message || t('authLocked'));
+        } else if (result.status === "maintenance") {
+          renderMaintenanceScreen();
         } else {
           alert(t('authError'));
         }
@@ -297,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h2>' + t('guestNamePromptTitle') + '</h2>\
       <p style="font-size: 12px; color: #666; text-align: center; margin-bottom: 15px; line-height: 1.4;">' + t('guestNamePromptDesc') + '</p>\
       \
-      <input type="text" id="input-guest-name" class="input-field" placeholder="' + t('guestNamePlaceholder') + '">\
+      <input type="text" id="input-guest-name" class="input-field" placeholder="' + escapeHtml(t('guestNamePlaceholder')) + '" maxlength="50">\
       \
       <div style="font-size: 11px; color: #d9534f; background: #fff8f8; border: 1px solid #ffeded; border-radius: 5px; padding: 10px; margin-bottom: 15px; line-height: 1.4;">\
         ' + t('guestNameNotice') + '\
@@ -316,28 +352,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderGuestTopMenu(nameInput, facilityName);
     });
 
-    document.getElementById('btn-back-auth').addEventListener('click', renderOtaAuthForm);
+    // 「認証画面へ戻る」押下時は保持トークンを破棄して5項目選択からやり直せるようにする
+    document.getElementById('btn-back-auth').addEventListener('click', () => {
+      saveOtaToken('');
+      renderOtaAuthForm();
+    });
   }
 
   // ゲストTOPメニュー
   function renderGuestTopMenu(rawGuestName, facilityName) {
-    const isDebugActive = localStorage.getItem('ota_debug_skip') === 'true';
-
-    let debugExitBtnHtml = '';
-    if (isDebugActive) {
-      debugExitBtnHtml = '<button class="btn btn-danger" id="btn-exit-debug" style="background-color: #d9534f; margin-top: 15px;">' + t('exitDebug') + '</button>';
-    }
-
     const guestDisplayName = formatGuestDisplayName(rawGuestName);
+    const locFacName = getLocalizedFacilityName(facilityName);
 
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + getLocalizedFacilityName(facilityName) + '】<br>' + guestDisplayName + '<br>----<br>' + t('guestTopMenuPrompt') + '</h2>\
+      <h2>【' + escapeHtml(locFacName) + '】<br>' + escapeHtml(guestDisplayName) + '<br>----<br>' + t('guestTopMenuPrompt') + '</h2>\
       <button class="btn btn-primary" id="btn-during-stay">' + t('duringStay') + '</button>\
       <button class="btn btn-primary" id="btn-route-access">' + t('routeAccess') + '</button>\
       <button class="btn btn-primary" id="btn-virtual-tour-guest">' + t('virtualTour') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('backToAuth') + '</button>\
-      ' + debugExitBtnHtml + '\
       \
       <div style="font-size: 11px; color: #666; margin-top: 25px; line-height: 1.5; border-top: 1px solid #eee; padding-top: 15px; text-align: center;">\
         ' + t('privacyNotice') + '\
@@ -348,15 +381,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-during-stay').addEventListener('click', () => renderGuestActionMenu(rawGuestName, facilityName));
     document.getElementById('btn-route-access').addEventListener('click', () => renderRouteAccessMenu(rawGuestName, facilityName));
     document.getElementById('btn-virtual-tour-guest').addEventListener('click', () => renderVirtualTourMenu(rawGuestName, facilityName));
-    document.getElementById('btn-back').addEventListener('click', renderOtaAuthForm);
-
-    if (isDebugActive) {
-      document.getElementById('btn-exit-debug').addEventListener('click', () => {
-        localStorage.removeItem('ota_debug_skip');
-        alert("認証スキップ（デバッグモード）を終了しました。通常モードに戻ります。");
-        renderOtaAuthForm();
-      });
-    }
+    document.getElementById('btn-back').addEventListener('click', () => {
+      saveOtaToken('');
+      renderOtaAuthForm();
+    });
   }
 
   function renderRouteAccessMenu(rawGuestName, facilityName) {
@@ -365,27 +393,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h2>' + t('routeAccess') + '</h2>\
       <p style="font-size: 13px; color: #ff4d4f; text-align: center; margin-bottom: 15px; font-weight: bold;">' + t('locationWarning') + '</p>\
     ';
-    
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
       const prefix = t('accessPrefix');
-      const suffix = t('accessSuffix'); 
-      const btnText = prefix + facility.name + suffix;
-      html += '<button class="btn btn-primary btn-map" data-id="' + facility.id + '">' + btnText + '</button>';
+      const suffix = t('accessSuffix');
+      const btnText = prefix + escapeHtml(facility.name) + suffix;
+      html += '<button class="btn btn-primary btn-map" data-id="' + escapeHtml(facility.id) + '">' + btnText + '</button>';
     });
-    
+
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderRouteAccessMenu, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-map').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const facilityId = e.target.getAttribute('data-id');
+        const facilityId = e.currentTarget.getAttribute('data-id');
         const mapUrl = APP_CONFIG.mapUrls[facilityId];
-        if(mapUrl) window.open(mapUrl, '_blank');
+        if (mapUrl) window.open(mapUrl, '_blank');
       });
     });
-    
+
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
@@ -394,34 +422,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       ' + renderLangSelectorHtml() + '\
       <h2>' + t('virtualTour') + '</h2>\
     ';
-    
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      html += '<button class="btn btn-primary btn-vt" data-id="' + facility.id + '">' + facility.name + '</button>';
+      html += '<button class="btn btn-primary btn-vt" data-id="' + escapeHtml(facility.id) + '">' + escapeHtml(facility.name) + '</button>';
     });
-    
+
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderVirtualTourMenu, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-vt').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const facilityId = e.target.getAttribute('data-id');
+        const facilityId = e.currentTarget.getAttribute('data-id');
         const vtUrl = APP_CONFIG.virtualTourUrls[facilityId];
-        if(vtUrl) window.open(vtUrl, '_blank');
+        if (vtUrl) window.open(vtUrl, '_blank');
       });
     });
-    
+
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
   function renderGuestActionMenu(rawGuestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
     const guestDisplayName = formatGuestDisplayName(rawGuestName);
-    
+
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + locFacName + '】<br>' + guestDisplayName + '<br>----<br>' + t('selectGuestMenu') + '</h2>\
+      <h2>【' + escapeHtml(locFacName) + '】<br>' + escapeHtml(guestDisplayName) + '<br>----<br>' + t('selectGuestMenu') + '</h2>\
       <button class="btn btn-primary" id="btn-checkinout">' + t('checkinout') + '</button>\
       <button class="btn btn-primary" id="btn-survey">' + t('survey') + '</button>\
       <button class="btn btn-primary" id="btn-contact">' + t('contact') + '</button>\
@@ -439,49 +467,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-back').addEventListener('click', () => renderGuestTopMenu(rawGuestName, facilityName));
   }
 
-  // ★ チェックイン・チェックアウト処理（完全多言語対応化）
+  // チェックイン・チェックアウト処理
   function renderCheckInOutAction(rawGuestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
     const guestDisplayName = formatGuestDisplayName(rawGuestName);
 
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>【' + locFacName + '】<br>' + guestDisplayName + '<br>' + t('selectAction') + '</h2>\
+      <h2>【' + escapeHtml(locFacName) + '】<br>' + escapeHtml(guestDisplayName) + '<br>' + t('selectAction') + '</h2>\
       <button class="btn btn-primary" id="btn-in">' + t('checkInBtn') + '</button>\
       <button class="btn btn-primary" id="btn-out">' + t('checkOutBtn') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
     bindLangSelectorEvents(renderCheckInOutAction, rawGuestName, facilityName);
-    
+
     const submitAction = async (actionText, actionLogText) => {
       const confirmMsg = '【' + locFacName + '】\n' + guestDisplayName + '\n\n「' + actionText + '」\n\n' + t('confirmSend');
       if (!confirm(confirmMsg)) return;
-      
+
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
-      const success = await sendToGAS("guest", facilityName, rawGuestName, actionLogText, currentLang);
-      
+      const res = await sendToGAS("guest", facilityName, rawGuestName, actionLogText, currentLang);
+
       loading.classList.add('hidden');
-      if (success) {
+      if (res.ok) {
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestDisplayName);
+            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => guestDisplayName);
             const msgSupport = t('ci_msg_support');
             alert(msgWelcome + '\n\n' + msgSupport);
           } else {
-            // ★ kukka / LUONTO のチェックイン完了時ポップアップ（多言語対応）
             alert(t('ci_msg_contact_direct'));
           }
         } else {
-          // ★ チェックアウト完了時ポップアップ（多言語対応）
           alert(t('co_msg_success'));
         }
         renderGuestActionMenu(rawGuestName, facilityName);
+      } else if (res.status === "auth_expired") {
+        saveOtaToken('');
+        alert(res.message || t('sessionExpired'));
+        renderOtaAuthForm();
+      } else if (res.status === "maintenance") {
+        renderMaintenanceScreen();
       } else {
-        alert(t('sendFail'));
+        alert(t('sendFail') + (res.message || ""));
       }
     };
 
@@ -497,16 +529,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     ';
     APP_CONFIG.contactCategories.forEach(cat => {
       const catName = t('cat_' + cat.key);
-      html += '<button class="btn btn-primary btn-cat" data-name="' + catName + '">' + catName + '</button>';
+      html += '<button class="btn btn-primary btn-cat" data-name="' + escapeHtml(catName) + '">' + escapeHtml(catName) + '</button>';
     });
     html += '<button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>';
-    
+
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderGuestContactCategory, rawGuestName, facilityName);
 
     document.querySelectorAll('.btn-cat').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const categoryName = e.target.getAttribute('data-name');
+        const categoryName = e.currentTarget.getAttribute('data-name');
         renderGuestContactForm(rawGuestName, facilityName, categoryName);
       });
     });
@@ -516,8 +548,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderGuestContactForm(rawGuestName, facilityName, categoryName) {
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
-      <h2>' + categoryName + '</h2>\
-      <textarea id="inquiry-text" class="input-field" placeholder="' + t('inquiryPlaceholder') + '"></textarea>\
+      <h2>' + escapeHtml(categoryName) + '</h2>\
+      <textarea id="inquiry-text" class="input-field" placeholder="' + escapeHtml(t('inquiryPlaceholder')) + '" maxlength="1000"></textarea>\
       <button class="btn btn-primary" id="btn-send">' + t('sendToStaff') + '</button>\
       <button class="btn btn-secondary" id="btn-back">' + t('back') + '</button>\
     ';
@@ -526,7 +558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-send').addEventListener('click', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
-      
+
       const locFacName = getLocalizedFacilityName(facilityName);
       const messageToChat = '【' + categoryName + '】\n施設：' + locFacName + '\nお名前：' + rawGuestName + ' 様\n\n' + text;
       const confirmMsg = t('confirmSend') + '\n\n' + messageToChat;
@@ -534,14 +566,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
-      const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: rawGuestName, message: text });
+      const res = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: rawGuestName, message: text });
       loading.classList.add('hidden');
 
-      if (success) {
+      if (res.ok) {
         alert(t('pcFallbackSuccess'));
         renderGuestActionMenu(rawGuestName, facilityName);
+      } else if (res.status === "auth_expired") {
+        saveOtaToken('');
+        alert(res.message || t('sessionExpired'));
+        renderOtaAuthForm();
+      } else if (res.status === "maintenance") {
+        renderMaintenanceScreen();
       } else {
-        alert(t('sendFail'));
+        alert(t('sendFail') + (res.message || ""));
       }
     });
 
@@ -549,26 +587,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function sendToGAS(type, facilityName, guestName, action, lang) {
-    const payload = { channel: "ota", clientId: clientId, type, facilityName, guestName, action, detail: lang };
-    try {
-      const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-      const text = await response.text();
-      if (text === "Error") return false;
-      return true;
-    } catch (e) {
-      return false;
-    }
+    const payload = {
+      channel: "ota",
+      clientId: clientId,
+      otaToken: otaToken,
+      adminKey: adminKey,
+      type: type,
+      facilityName: facilityName,
+      guestName: guestName,
+      action: action,
+      detail: lang
+    };
+    return await postOtaToGAS(payload);
   }
 
   async function notifyToGAS(type, dataObj) {
-    const payload = { channel: "ota", clientId: clientId, type: type, data: dataObj };
+    const payload = {
+      channel: "ota",
+      clientId: clientId,
+      otaToken: otaToken,
+      adminKey: adminKey,
+      type: type,
+      data: dataObj
+    };
+    return await postOtaToGAS(payload);
+  }
+
+  async function postOtaToGAS(payload) {
     try {
       const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
       const text = await response.text();
-      if (text === "Error") return false;
-      return true;
+      if (text === "Error") return { ok: false, status: "error" };
+      const json = JSON.parse(text);
+      return { ok: json.status === "success", status: json.status, message: json.message || "" };
     } catch (e) {
-      return false;
+      return { ok: false, status: "network_error", message: e.message };
     }
   }
 });

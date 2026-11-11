@@ -6,11 +6,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
   function t(key) {
-    let val = APP_CONFIG.translations[currentLang][key];
+    let val = APP_CONFIG.translations[currentLang]?.[key];
     if (val !== undefined) return val;
     val = APP_CONFIG.translations['ja'][key];
     if (val !== undefined) return val;
     return key;
+  }
+
+  // XSS・表示崩れ防止用HTMLエスケープ関数（ユーザー入力値・動的表示用）
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   function getLocalizedFacilityName(name) {
@@ -27,12 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (localizedFac) return localizedFac.name;
     }
     return name;
-  }
-
-  function changeLang(lang) {
-    currentLang = lang;
-    localStorage.setItem('app_lang', lang);
-    renderTopMenu();
   }
 
   function renderLangSelectorHtml() {
@@ -61,6 +66,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     liff.closeWindow();
   }
 
+  // トークン期限切れによる再認証時に、直前の画面と入力値を一時退避・復元するヘルパー
+  function triggerReauthWithState(stateObj) {
+    try {
+      sessionStorage.setItem('liff_reauth_state', JSON.stringify(stateObj));
+    } catch (e) {}
+    alert(t('sessionExpired'));
+    if (liff.isInClient()) {
+      location.reload();
+    } else {
+      liff.logout();
+      liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
+    }
+  }
+
+  function restoreAfterReauthIfNeeded() {
+    const raw = sessionStorage.getItem('liff_reauth_state');
+    if (!raw) return false;
+    sessionStorage.removeItem('liff_reauth_state');
+    try {
+      const st = JSON.parse(raw);
+      if (st.screen === 'checkInOut') {
+        renderCheckInOutAction(st.guestName, st.facilityName);
+        return true;
+      } else if (st.screen === 'guestContact') {
+        renderGuestContactForm(st.guestName, st.facilityName, st.categoryName, st.draftText);
+        return true;
+      } else if (st.screen === 'returningBooking') {
+        renderReturningBookingForm(st.draftData);
+        return true;
+      } else if (st.screen === 'firstTimeBooking') {
+        renderBookingMenu();
+        return true;
+      } else if (st.screen === 'nonGuestInquiry') {
+        renderNonGuestInquiryForm(st.draftName, st.draftText);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   try {
     await liff.init({ liffId: APP_CONFIG.LIFF_ID });
 
@@ -69,7 +114,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ★ 起動時のメンテナンスステータス確認通信
     const idToken = liff.getIDToken();
     const response = await fetch(APP_CONFIG.GAS_URL, {
       method: 'POST',
@@ -77,20 +121,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const result = await response.json();
 
+    if (result.status === 'error' && (result.code === 'TOKEN_EXPIRED' || result.code === 'AUTH_ERROR')) {
+      if (!sessionStorage.getItem('liff_init_retried')) {
+        sessionStorage.setItem('liff_init_retried', '1');
+        if (liff.isInClient()) {
+          location.reload();
+        } else {
+          liff.logout();
+          liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
+        }
+        return;
+      }
+    }
+    sessionStorage.removeItem('liff_init_retried');
+
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
 
     if (result.isMaintenance) {
       renderMaintenanceScreen();
     } else {
-      renderTopMenu();
+      if (!restoreAfterReauthIfNeeded()) {
+        renderTopMenu();
+      }
     }
   } catch (error) {
     loading.innerText = 'エラーが発生しました: ' + error.message;
   }
 
   // ==========================================
-  // 【新設】メンテナンス専用画面
+  // メンテナンス専用画面
   // ==========================================
   function renderMaintenanceScreen() {
     appContent.innerHTML = `
@@ -114,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button class="btn btn-secondary" id="btn-nonguest">${t('nonGuest')}<br><small>${t('nonGuestSub')}</small></button>
     `;
     bindLangSelectorEvents(renderTopMenu);
-    
+
     document.getElementById('btn-guest').addEventListener('click', renderGuestTopMenu);
     document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
   }
@@ -148,25 +208,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h2>${t('routeAccess')}</h2>
       <p style="font-size: 13px; color: #ff4d4f; text-align: center; margin-bottom: 15px; font-weight: bold;">${t('locationWarning')}</p>
     `;
-    
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
       const prefix = t('accessPrefix');
-      const suffix = t('accessSuffix'); 
-      const btnText = `${prefix}${facility.name}${suffix}`;
-      html += `<button class="btn btn-primary btn-map" data-id="${facility.id}">${btnText}</button>`;
+      const suffix = t('accessSuffix');
+      const btnText = `${prefix}${escapeHtml(facility.name)}${suffix}`;
+      html += `<button class="btn btn-primary btn-map" data-id="${escapeHtml(facility.id)}">${btnText}</button>`;
     });
-    
+
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderRouteAccessMenu);
 
     document.querySelectorAll('.btn-map').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const facilityId = e.target.getAttribute('data-id');
+        const facilityId = e.currentTarget.getAttribute('data-id');
         const mapUrl = APP_CONFIG.mapUrls[facilityId];
-        if(mapUrl) {
+        if (mapUrl) {
           if (liff.isInClient()) {
             liff.openWindow({ url: mapUrl, external: true });
           } else {
@@ -175,34 +235,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
-    
+
     document.getElementById('btn-back').addEventListener('click', renderGuestTopMenu);
   }
 
   // ==========================================
-  // 【新設】バーチャルツアー施設選択メニュー
+  // バーチャルツアー施設選択メニュー
   // ==========================================
   function renderVirtualTourMenu(source) {
     let html = `
       ${renderLangSelectorHtml()}
       <h2>${t('virtualTour')}</h2>
     `;
-    
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      html += `<button class="btn btn-primary btn-vt" data-id="${facility.id}">${facility.name}</button>`;
+      html += `<button class="btn btn-primary btn-vt" data-id="${escapeHtml(facility.id)}">${escapeHtml(facility.name)}</button>`;
     });
-    
+
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderVirtualTourMenu, source);
 
     document.querySelectorAll('.btn-vt').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const facilityId = e.target.getAttribute('data-id');
+        const facilityId = e.currentTarget.getAttribute('data-id');
         const vtUrl = APP_CONFIG.virtualTourUrls[facilityId];
-        if(vtUrl) {
+        if (vtUrl) {
           if (liff.isInClient()) {
             liff.openWindow({ url: vtUrl, external: true });
           } else {
@@ -211,7 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
-    
+
     document.getElementById('btn-back').addEventListener('click', () => {
       if (source === 'guest') {
         renderGuestTopMenu();
@@ -222,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層③〜】既存の宿泊ゲスト向けフロー
+  // 【階層③〜】宿泊ゲスト向けフロー
   // ==========================================
   function renderGuestNameForm() {
     const savedName = localStorage.getItem('guest_name') || '';
@@ -230,42 +290,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('namePrompt')}</h2>
-      <input type="text" id="guest-name-input" class="input-field" placeholder="${t('namePlaceholder')}" value="${savedName}" required>
+      <input type="text" id="guest-name-input" class="input-field" placeholder="${escapeHtml(t('namePlaceholder'))}" value="${escapeHtml(savedName)}" maxlength="50" required>
       <button class="btn btn-primary" id="btn-next">${t('next')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
     bindLangSelectorEvents(renderGuestNameForm);
-    
+
     document.getElementById('btn-next').addEventListener('click', () => {
       const name = document.getElementById('guest-name-input').value.trim();
       if (!name) return alert(t('nameAlert'));
-      
+
       localStorage.setItem('guest_name', name);
-      
       renderGuestFacilitySelect(name);
     });
-    
+
     document.getElementById('btn-back').addEventListener('click', renderGuestTopMenu);
   }
 
   function renderGuestFacilitySelect(guestName) {
     let html = `
       ${renderLangSelectorHtml()}
-      <h2>${guestName} 様<br>${t('selectFacility')}</h2>
+      <h2>${escapeHtml(guestName)} 様<br>${t('selectFacility')}</h2>
     `;
-    
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     currentFacilities.forEach(facility => {
-      html += `<button class="btn btn-primary btn-facility" data-name="${facility.name}">${facility.name}</button>`;
+      html += `<button class="btn btn-primary btn-facility" data-name="${escapeHtml(facility.name)}">${escapeHtml(facility.name)}</button>`;
     });
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderGuestFacilitySelect, guestName);
 
     document.querySelectorAll('.btn-facility').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const facilityName = e.target.getAttribute('data-name');
+        const facilityName = e.currentTarget.getAttribute('data-name');
         renderGuestActionMenu(guestName, facilityName);
       });
     });
@@ -274,10 +333,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderGuestActionMenu(guestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
-    
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${locFacName}】<br>${guestName} 様<br>----<br>${t('selectGuestMenu')}</h2>
+      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestName)} 様<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
@@ -298,29 +357,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${locFacName}】<br>${guestName} 様<br>${t('selectAction')}</h2>
+      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestName)} 様<br>${t('selectAction')}</h2>
       <button class="btn btn-primary" id="btn-in">${t('checkInBtn')}</button>
       <button class="btn btn-primary" id="btn-out">${t('checkOutBtn')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
     bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
-    
+
     const submitAction = async (actionText, actionLogText) => {
       const confirmMsg = `【${locFacName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
       if (!confirm(confirmMsg)) return;
-      
+
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
-      const success = await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang);
-      
+      const res = await sendToGAS("guest", facilityName, guestName, actionLogText, currentLang, {
+        screen: 'checkInOut',
+        guestName,
+        facilityName
+      });
+
       loading.classList.add('hidden');
-      if (success) {
+      if (!res || res.reauthing) return;
+
+      if (res.ok) {
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            msgWelcome = msgWelcome.replace('{facility}', locFacName).replace('{name}', guestName);
+            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => guestName);
             const msgSupport = t('ci_msg_support');
             alert(`${msgWelcome}\n\n${msgSupport}`);
           } else {
@@ -330,8 +395,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           alert(t('sendSuccess'));
         }
         renderGuestActionMenu(guestName, facilityName);
+      } else if (res.code === 'MAINTENANCE') {
+        renderMaintenanceScreen();
       } else {
-        alert(t('sendFail') + "(Auth Error)");
+        alert(t('sendFail') + (res.message || "(Error)"));
       }
     };
 
@@ -347,27 +414,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
     APP_CONFIG.contactCategories.forEach(cat => {
       const catName = t('cat_' + cat.key);
-      html += `<button class="btn btn-primary btn-cat" data-name="${catName}">${catName}</button>`;
+      html += `<button class="btn btn-primary btn-cat" data-name="${escapeHtml(catName)}">${escapeHtml(catName)}</button>`;
     });
     html += `<button class="btn btn-secondary" id="btn-back">${t('back')}</button>`;
-    
+
     appContent.innerHTML = html;
     bindLangSelectorEvents(renderGuestContactCategory, guestName, facilityName);
 
     document.querySelectorAll('.btn-cat').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const categoryName = e.target.getAttribute('data-name');
+        const categoryName = e.currentTarget.getAttribute('data-name');
         renderGuestContactForm(guestName, facilityName, categoryName);
       });
     });
     document.getElementById('btn-back').addEventListener('click', () => renderGuestActionMenu(guestName, facilityName));
   }
 
-  function renderGuestContactForm(guestName, facilityName, categoryName) {
+  function renderGuestContactForm(guestName, facilityName, categoryName, restoredText = '') {
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>${categoryName}</h2>
-      <textarea id="inquiry-text" class="input-field" placeholder="${t('inquiryPlaceholder')}"></textarea>
+      <h2>${escapeHtml(categoryName)}</h2>
+      <textarea id="inquiry-text" class="input-field" placeholder="${escapeHtml(t('inquiryPlaceholder'))}" maxlength="1000">${escapeHtml(restoredText)}</textarea>
       <button class="btn btn-primary" id="btn-send">${t('sendLine')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
@@ -376,7 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-send').addEventListener('click', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!text) return alert(t('inquiryAlert'));
-      
+
       const locFacName = getLocalizedFacilityName(facilityName);
       const messageToChat = `【${categoryName}】\n施設：${locFacName}\nお名前：${guestName} 様\n\n${text}`;
       const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
@@ -389,13 +456,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           loading.innerText = t('loading');
           loading.classList.remove('hidden');
-          const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: facilityName, guestName: guestName, message: text });
+          const res = await notifyToGAS(
+            "pc_inquiry",
+            { category: categoryName, facilityName: facilityName, guestName: guestName, message: text },
+            { screen: 'guestContact', guestName, facilityName, categoryName, draftText: text }
+          );
           loading.classList.add('hidden');
-          
-          if (success) {
+          if (!res || res.reauthing) return;
+
+          if (res.ok) {
             alert(t('pcFallbackSuccess'));
+          } else if (res.code === 'MAINTENANCE') {
+            return renderMaintenanceScreen();
           } else {
-            return alert(t('sendFail') + "(Auth Error)");
+            return alert(t('sendFail') + (res.message || "(Error)"));
           }
         }
         renderGuestActionMenu(guestName, facilityName);
@@ -424,7 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-book').addEventListener('click', renderBookingMenu);
     document.getElementById('btn-virtual-tour-nonguest').addEventListener('click', () => renderVirtualTourMenu('nonguest'));
-    document.getElementById('btn-inquiry').addEventListener('click', renderNonGuestInquiryForm);
+    document.getElementById('btn-inquiry').addEventListener('click', () => renderNonGuestInquiryForm());
     document.getElementById('btn-close').addEventListener('click', closeApp);
     document.getElementById('btn-back').addEventListener('click', renderTopMenu);
   }
@@ -439,45 +513,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
     bindLangSelectorEvents(renderBookingMenu);
 
-    document.getElementById('btn-ret-guest').addEventListener('click', renderReturningBookingForm);
+    document.getElementById('btn-ret-guest').addEventListener('click', () => renderReturningBookingForm());
     document.getElementById('btn-first-guest').addEventListener('click', async () => {
-      
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
-      
-      const success = await notifyToGAS("push_notify", { category: "first_time_booking", lang: currentLang });
-      
+
+      const res = await notifyToGAS(
+        "push_notify",
+        { category: "first_time_booking", lang: currentLang },
+        { screen: 'firstTimeBooking' }
+      );
+
       loading.classList.add('hidden');
-      if (success) {
+      if (!res || res.reauthing) return;
+
+      if (res.ok) {
         window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      } else if (res.code === 'MAINTENANCE') {
+        renderMaintenanceScreen();
       } else {
-        alert(t('sendFail') + "(Auth Error)");
+        alert(t('sendFail') + (res.message || "(Error)"));
       }
     });
 
     document.getElementById('btn-back').addEventListener('click', renderNonGuestMenu);
   }
 
-  function renderReturningBookingForm() {
+  function renderReturningBookingForm(restoredData = null) {
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     let optionsHtml = '';
-    currentFacilities.forEach(f => { optionsHtml += `<option value="${f.name}">${f.name}</option>`; });
+    currentFacilities.forEach(f => {
+      const sel = (restoredData && restoredData.facility === f.name) ? 'selected' : '';
+      optionsHtml += `<option value="${escapeHtml(f.name)}" ${sel}>${escapeHtml(f.name)}</option>`;
+    });
+
+    const valYear = restoredData ? escapeHtml(restoredData.year) : '';
+    const valMonth = restoredData ? escapeHtml(restoredData.month) : '';
+    const valName = restoredData ? escapeHtml(restoredData.pastName) : '';
+    const valCoupon = restoredData ? escapeHtml(restoredData.coupon) : '';
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('lastStayDetail')}</h2>
-      <input type="number" id="stay-year" class="input-field" placeholder="${t('stayYear')}">
-      <input type="number" id="stay-month" class="input-field" placeholder="${t('stayMonth')}">
+      <input type="number" id="stay-year" class="input-field" placeholder="${escapeHtml(t('stayYear'))}" value="${valYear}">
+      <input type="number" id="stay-month" class="input-field" placeholder="${escapeHtml(t('stayMonth'))}" value="${valMonth}">
       <select id="stay-facility" class="input-field">
-        <option value="" disabled selected>${t('selectFacility')}</option>
+        <option value="" disabled ${!restoredData ? 'selected' : ''}>${escapeHtml(t('selectFacility'))}</option>
         ${optionsHtml}
       </select>
-      <input type="text" id="stay-name" class="input-field" placeholder="${t('pastName')}">
-      <input type="text" id="coupon-code" class="input-field" placeholder="${t('couponCode')}">
+      <input type="text" id="stay-name" class="input-field" placeholder="${escapeHtml(t('pastName'))}" value="${valName}" maxlength="50">
+      <input type="text" id="coupon-code" class="input-field" placeholder="${escapeHtml(t('couponCode'))}" value="${valCoupon}" maxlength="50">
       <button class="btn btn-primary" id="btn-proceed">${t('proceedHp')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
-    bindLangSelectorEvents(renderReturningBookingForm);
+    bindLangSelectorEvents(renderReturningBookingForm, restoredData);
 
     document.getElementById('btn-proceed').addEventListener('click', async () => {
       const year = document.getElementById('stay-year').value.trim();
@@ -493,39 +582,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       loading.innerText = t('loading');
       loading.classList.remove('hidden');
 
-      const success = await notifyToGAS("push_notify", { 
-        category: "returning_booking", 
-        year, month, facility, pastName, coupon, lang: currentLang
+      const payloadData = { category: "returning_booking", year, month, facility, pastName, coupon, lang: currentLang };
+      const res = await notifyToGAS("push_notify", payloadData, {
+        screen: 'returningBooking',
+        draftData: { year, month, facility, pastName, coupon }
       });
-      
+
       loading.classList.add('hidden');
-      if (success) {
+      if (!res || res.reauthing) return;
+
+      if (res.ok) {
         window.location.href = APP_CONFIG.HP_BOOKING_URL;
+      } else if (res.code === 'MAINTENANCE') {
+        renderMaintenanceScreen();
       } else {
-        alert(t('sendFail') + "(Auth Error)");
+        alert(t('sendFail') + (res.message || "(Error)"));
       }
     });
 
     document.getElementById('btn-back').addEventListener('click', renderBookingMenu);
   }
 
-  function renderNonGuestInquiryForm() {
+  function renderNonGuestInquiryForm(restoredName = '', restoredText = '') {
     const categoryName = t('nonGuestInquiryName');
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>${categoryName}</h2>
-      <input type="text" id="inquiry-name" class="input-field" placeholder="${t('yourName')}" required>
-      <textarea id="inquiry-text" class="input-field" placeholder="${t('inquiryPlaceholder')}"></textarea>
+      <h2>${escapeHtml(categoryName)}</h2>
+      <input type="text" id="inquiry-name" class="input-field" placeholder="${escapeHtml(t('yourName'))}" value="${escapeHtml(restoredName)}" maxlength="50" required>
+      <textarea id="inquiry-text" class="input-field" placeholder="${escapeHtml(t('inquiryPlaceholder'))}" maxlength="1000">${escapeHtml(restoredText)}</textarea>
       <button class="btn btn-primary" id="btn-send">${t('sendLine')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
     `;
-    bindLangSelectorEvents(renderNonGuestInquiryForm);
+    bindLangSelectorEvents(renderNonGuestInquiryForm, restoredName, restoredText);
 
     document.getElementById('btn-send').addEventListener('click', async () => {
       const name = document.getElementById('inquiry-name').value.trim();
       const text = document.getElementById('inquiry-text').value.trim();
       if (!name || !text) return alert(t('inquiryAlert'));
-      
+
       const messageToChat = `【${categoryName}】\nお名前：${name} 様\n\n${text}`;
       const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
       if (!confirm(confirmMsg)) return;
@@ -537,13 +631,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           loading.innerText = t('loading');
           loading.classList.remove('hidden');
-          const success = await notifyToGAS("pc_inquiry", { category: categoryName, facilityName: "一般", guestName: name, message: text });
+          const res = await notifyToGAS(
+            "pc_inquiry",
+            { category: categoryName, facilityName: "一般", guestName: name, message: text },
+            { screen: 'nonGuestInquiry', draftName: name, draftText: text }
+          );
           loading.classList.add('hidden');
+          if (!res || res.reauthing) return;
 
-          if (success) {
+          if (res.ok) {
             alert(t('pcFallbackSuccess'));
+          } else if (res.code === 'MAINTENANCE') {
+            return renderMaintenanceScreen();
           } else {
-            return alert(t('sendFail') + "(Auth Error)");
+            return alert(t('sendFail') + (res.message || "(Error)"));
           }
         }
         renderNonGuestMenu();
@@ -556,41 +657,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【共通】GAS通信用ユーティリティ
+  // 【共通】GAS通信用ユーティリティ（期限切れ自動復元対応）
   // ==========================================
-  
-  async function sendToGAS(type, facilityName, guestName, action, lang) {
-    const idToken = liff.getIDToken();
-    if (!idToken) {
-      alert(t('sessionExpired'));
-      liff.logout();
-      liff.login({ scopes: ['openid', 'profile', 'chat_message.write'] });
-      return false;
-    }
-    const payload = { idToken, type, facilityName, guestName, action, detail: lang };
+  async function postPayloadToGAS(payload, stateForReauth) {
     try {
       const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
       const text = await response.text();
-      if (text === "Error") return false;
-      return true;
+      if (text === "Error") return { ok: false, code: "ERROR" };
+
+      let json = {};
+      try { json = JSON.parse(text); } catch (e) {}
+
+      if (json.status === "success") {
+        return { ok: true };
+      }
+
+      if (json.code === "TOKEN_EXPIRED" || json.code === "AUTH_ERROR") {
+        triggerReauthWithState(stateForReauth);
+        return { ok: false, reauthing: true };
+      }
+
+      if (json.code === "RATE_LIMIT") {
+        return { ok: false, code: "RATE_LIMIT", message: "短時間に送信が集中しています。数分後にお試しください。" };
+      }
+
+      return { ok: false, code: json.code || "ERROR", message: json.message || "" };
     } catch (e) {
-      console.error("GAS send error", e);
-      return false;
+      console.error("GAS communication error", e);
+      return { ok: false, code: "NETWORK_ERROR" };
     }
   }
 
-  async function notifyToGAS(type, dataObj) {
+  async function sendToGAS(type, facilityName, guestName, action, lang, stateForReauth) {
     const idToken = liff.getIDToken();
-    if (!idToken) return false;
-    const payload = { idToken, type: type, data: dataObj };
-    try {
-      const response = await fetch(APP_CONFIG.GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-      const text = await response.text();
-      if (text === "Error") return false;
-      return true;
-    } catch (e) {
-      console.error("GAS notify error", e);
-      return false;
+    if (!idToken) {
+      triggerReauthWithState(stateForReauth);
+      return { ok: false, reauthing: true };
     }
+    const payload = { idToken, type, facilityName, guestName, action, detail: lang };
+    return await postPayloadToGAS(payload, stateForReauth);
+  }
+
+  async function notifyToGAS(type, dataObj, stateForReauth) {
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+      triggerReauthWithState(stateForReauth);
+      return { ok: false, reauthing: true };
+    }
+    const payload = { idToken, type: type, data: dataObj };
+    return await postPayloadToGAS(payload, stateForReauth);
   }
 });
