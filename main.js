@@ -5,6 +5,133 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
+  // ★ スタッフ認証状態と備品データキャッシュ
+  let isStaffUser = false;
+  let currentMyUserId = '';
+  let inventoryCache = {};
+  let currentInvTab = 'LUONTO'; // 'SHORTAGE' | 'LUONTO' | 'kukka' | 'sch-sch' | 'ホッポッタ' | 'COMMON'
+  let openSectionsMap = {}; // アコーディオン開閉状態の保持用
+
+  // ==========================================
+  // ★ 備品マスタ定義（全39品目・6カテゴリ ＋ 施設共通2種6個体）
+  // ==========================================
+  const INVENTORY_SECTIONS = [
+    {
+      id: 'sec_towel_bed',
+      title: '① タオル・寝具類',
+      items: [
+        { key: 'bath_towel', name: 'バスタオル', type: '4level', facilities: 'ALL' },
+        { key: 'sauna_towel', name: 'サウナ用タオル', type: '4level', facilities: 'ALL' },
+        { key: 'sauna_mat', name: 'サウナ用マット', type: '4level', facilities: 'ALL' },
+        { key: 'sauna_pants', name: 'サウナ用パンツ', type: '4level', facilities: ['LUONTO', 'kukka'] },
+        { key: 'body_towel', name: 'ボディタオル', type: '4level', facilities: 'ALL' },
+        { key: 'single_sheet', name: 'シングルシーツ', type: '4level', facilities: 'ALL' },
+        { key: 'double_sheet', name: 'ダブルシーツ', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
+        { key: 'bath_mat', name: '足ふきマット', type: '4level', facilities: 'ALL' },
+        { key: 'pillow_cover', name: '枕カバー', type: '4level', facilities: 'ALL' }
+      ]
+    },
+    {
+      id: 'sec_wash_bath',
+      title: '② 洗面所・バス用品',
+      items: [
+        { key: 'toothbrush', name: '歯ブラシ', type: '4level', facilities: 'ALL' },
+        { key: 'body_sponge', name: 'ボディスポンジ', type: '4level', facilities: 'ALL' },
+        { key: 'hair_brush', name: 'ヘアブラシ', type: '4level', facilities: ['LUONTO', 'kukka'] },
+        { key: 'wash_handsoap', name: '洗面所用ハンドソープ', type: '2level', facilities: 'ALL' },
+        { key: 'shampoo', name: 'シャンプー', type: '2level', facilities: 'ALL' },
+        { key: 'conditioner', name: 'コンディショナー', type: '2level', facilities: 'ALL' },
+        { key: 'body_soap', name: 'ボディソープ', type: '2level', facilities: 'ALL' },
+        { key: 'cleansing', name: 'クレンジング', type: '2level', facilities: 'ALL' },
+        { key: 'laundry_bag', name: '洗面所洗濯物用ビニール袋', type: '4level', facilities: 'ALL' }
+      ]
+    },
+    {
+      id: 'sec_kitchen_cafe',
+      title: '③ キッチン・カフェ用品',
+      items: [
+        { key: 'dish_detergent', name: '食器洗い洗剤', type: '2level', facilities: 'ALL' },
+        { key: 'kitchen_handsoap', name: 'キッチン用ハンドソープ', type: '2level', facilities: 'ALL' },
+        { key: 'dish_sponge', name: '食器洗い用スポンジ', type: '4level', facilities: 'ALL' },
+        { key: 'kitchen_net', name: 'キッチンネット', type: '4level', facilities: 'ALL' },
+        { key: 'kitchen_paper', name: 'キッチンペーパー', type: '4level', facilities: 'ALL' },
+        { key: 'saran_wrap', name: 'サランラップ', type: '4level', facilities: 'ALL' },
+        { key: 'nonwoven_towel', name: '不織布タオル', type: '4level', facilities: 'ALL' },
+        { key: 'coffee_beans', name: 'コーヒー豆', type: '2level', facilities: 'ALL' },
+        { key: 'black_tea', name: '紅茶', type: '2level', facilities: 'ALL' }
+      ]
+    },
+    {
+      id: 'sec_toilet_clean',
+      title: '④ トイレ・清掃・洗濯消耗品',
+      items: [
+        { key: 'toilet_paper', name: 'トイレットペーパー', type: 'number', unit: '残りロール数', facilities: 'ALL' },
+        { key: 'toilet_towel', name: 'トイレ用タオル', type: '2level', facilities: ['kukka', 'sch-sch'] },
+        { key: 'toilet_wiper', name: 'トイレ用ワイパー', type: 'number', unit: '残りパック数', facilities: 'ALL' },
+        { key: 'toilet_detergent', name: '便器用洗剤(便器掃除用)', type: '2level', facilities: 'ALL' },
+        { key: 'bath_detergent', name: '風呂用洗剤', type: '2level', facilities: 'ALL' },
+        { key: 'laundry_detergent', name: '洗濯用洗剤', type: '2level', facilities: 'ALL' },
+        { key: 'vinyl_gloves', name: 'ビニール手袋', type: '2level', facilities: 'ALL' },
+        { key: 'tissue', name: 'ティッシュ', type: '4level', facilities: 'ALL' },
+        { key: 'slippers', name: 'スリッパ', type: '2level', facilities: 'ALL' }
+      ]
+    },
+    {
+      id: 'sec_garbage',
+      title: '⑤ 指定ゴミ袋類',
+      items: [
+        { key: 'garbage_burn_xl', name: '指定ゴミ袋可燃特大', type: '4level', facilities: 'ALL' },
+        { key: 'garbage_burn_l', name: '指定ゴミ袋可燃大', type: '4level', facilities: 'ALL' },
+        { key: 'garbage_burn_s', name: '指定ゴミ袋可燃小', type: '4level', facilities: 'ALL' },
+        { key: 'garbage_nonburn_l', name: '指定ゴミ袋ビンカン不燃大', type: '4level', facilities: 'ALL' },
+        { key: 'garbage_nonburn_s', name: '指定ゴミ袋ビンカン不燃小', type: '4level', facilities: 'ALL' }
+      ]
+    },
+    {
+      id: 'sec_bbq',
+      title: '⑥ BBQ用品',
+      items: [
+        { key: 'bbq_igniter', name: 'BBQ着火剤', type: '2level', facilities: 'ALL' },
+        { key: 'bbq_charcoal', name: 'BBQ炭', type: 'number', unit: '箱数', facilities: 'ALL' },
+        { key: 'bbq_plate_l', name: 'BBQ紙皿大', type: '2level', facilities: 'ALL' },
+        { key: 'bbq_plate_s', name: 'BBQ紙皿小', type: '2level', facilities: 'ALL' },
+        { key: 'bbq_chopsticks', name: 'BBQ割りばし', type: '2level', facilities: 'ALL' },
+        { key: 'bbq_mosquito', name: 'BBQ蚊取り線香', type: '2level', facilities: 'ALL' }
+      ]
+    }
+  ];
+
+  const COMMON_EQUIPMENT_SECTIONS = [
+    {
+      id: 'common_baby_chair',
+      title: '🪑 ベビーチェア（計4台・所在施設）',
+      items: [
+        { key: 'chair_swing', name: '① スイング式' },
+        { key: 'chair_disney', name: '② ディズニー' },
+        { key: 'chair_ikea1', name: '③ IKEA(1)' },
+        { key: 'chair_ikea2', name: '④ IKEA(2)' }
+      ]
+    },
+    {
+      id: 'common_baby_bed',
+      title: '🛏️ ベビーベッド（計2台・所在施設）',
+      items: [
+        { key: 'bed_easy', name: '① 組み立て簡単' },
+        { key: 'bed_hard', name: '② 組み立て難' }
+      ]
+    }
+  ];
+
+  const FACILITY_LIST = ['LUONTO', 'kukka', 'sch-sch', 'ホッポッタ'];
+
+  function getTodayDateString() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   function t(key) {
     let val = APP_CONFIG.translations[currentLang]?.[key];
     if (val !== undefined) return val;
@@ -101,6 +228,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else if (st.screen === 'nonGuestInquiry') {
         renderNonGuestInquiryForm(st.draftName, st.draftText);
         return true;
+      } else if (st.screen === 'staffInventory' && isStaffUser) {
+        openStaffInventoryApp();
+        return true;
       }
     } catch (e) {}
     return false;
@@ -135,6 +265,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     sessionStorage.removeItem('liff_init_retried');
 
+    isStaffUser = Boolean(result.isStaff);
+    currentMyUserId = result.myUserId || '';
+
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
 
@@ -164,19 +297,471 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層①】TOPメニュー
+  // 【階層①】TOPメニュー（スタッフのみ備品管理入口を表示）
   // ==========================================
   function renderTopMenu() {
+    const staffBtnHtml = isStaffUser
+      ? `<button class="btn btn-staff-entry" id="btn-staff-inv">🔧 スタッフ用メニュー (備品在庫管理)</button>`
+      : '';
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>${t('selectMenu')}</h2>
+      <h2 id="top-menu-heading" style="user-select: none;">${t('selectMenu')}</h2>
       <button class="btn btn-primary" id="btn-guest">${t('guest')}<br><small>${t('guestSub')}</small></button>
       <button class="btn btn-secondary" id="btn-nonguest">${t('nonGuest')}<br><small>${t('nonGuestSub')}</small></button>
+      ${staffBtnHtml}
     `;
     bindLangSelectorEvents(renderTopMenu);
 
     document.getElementById('btn-guest').addEventListener('click', renderGuestTopMenu);
     document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
+
+    if (isStaffUser) {
+      document.getElementById('btn-staff-inv').addEventListener('click', openStaffInventoryApp);
+    }
+
+    // 新規スタッフ追加用：見出しを5回連続タップすると自分のLINE userIdを表示（権限自体は付与されないため安全）
+    let tapCount = 0;
+    let tapTimer = null;
+    const headingEl = document.getElementById('top-menu-heading');
+    if (headingEl) {
+      headingEl.addEventListener('click', () => {
+        tapCount++;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => { tapCount = 0; }, 1200);
+        if (tapCount >= 5) {
+          tapCount = 0;
+          if (currentMyUserId) {
+            prompt('【スタッフ登録用 LINE User ID】\n以下の文字列をコピーして管理者に共有してください：', currentMyUserId);
+          }
+        }
+      });
+    }
+  }
+
+  // ==========================================
+  // ★ スタッフ専用：貸別荘備品管理アプリ機能群
+  // ==========================================
+  async function openStaffInventoryApp() {
+    loading.innerText = '備品在庫データを読み込んでいます...';
+    loading.classList.remove('hidden');
+    appContent.classList.add('hidden');
+
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+      triggerReauthWithState({ screen: 'staffInventory' });
+      return;
+    }
+
+    try {
+      const response = await fetch(APP_CONFIG.GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'inv_get', idToken: idToken })
+      });
+      const json = await response.json();
+      loading.classList.add('hidden');
+      appContent.classList.remove('hidden');
+
+      if (json.status === 'success') {
+        inventoryCache = json.inventory || {};
+        renderStaffInventoryScreen();
+      } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+        triggerReauthWithState({ screen: 'staffInventory' });
+      } else {
+        alert('データ取得エラー: ' + (json.message || json.code || '権限がありません'));
+        renderTopMenu();
+      }
+    } catch (e) {
+      loading.classList.add('hidden');
+      appContent.classList.remove('hidden');
+      alert('通信エラーが発生しました: ' + e.message);
+      renderTopMenu();
+    }
+  }
+
+  // 品目が「要補充（少・極小 または 数値が1以下）」かどうか判定するヘルパー
+  function isItemShortage(itemDef, entry) {
+    if (!entry || entry.v === undefined || entry.v === null || entry.v === '') return false;
+    if (itemDef.type === 'number') {
+      const num = parseInt(entry.v, 10);
+      return !isNaN(num) && num <= 1;
+    }
+    return entry.v === '少' || entry.v === '極小';
+  }
+
+  // 特定施設・特定セクションの対象品目リストを返す
+  function getFacilityItemsForSection(section, facilityName) {
+    return section.items.filter(item => {
+      if (item.facilities === 'ALL') return true;
+      return Array.isArray(item.facilities) && item.facilities.includes(facilityName);
+    });
+  }
+
+  // サーバーへ1品目の更新を非同期オートセーブする関数
+  async function autoSaveInventoryItem(facilityKey, itemKey, newVal, newDate) {
+    if (!inventoryCache[facilityKey]) inventoryCache[facilityKey] = {};
+    inventoryCache[facilityKey][itemKey] = { v: newVal, d: newDate };
+
+    const badgeEl = document.getElementById('inv-save-badge');
+    if (badgeEl) {
+      badgeEl.className = 'save-status-badge saving';
+      badgeEl.innerText = '⏳ 保存中...';
+    }
+
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+      triggerReauthWithState({ screen: 'staffInventory' });
+      return;
+    }
+
+    try {
+      const response = await fetch(APP_CONFIG.GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'inv_update',
+          idToken: idToken,
+          facility: facilityKey,
+          itemKey: itemKey,
+          value: newVal,
+          date: newDate
+        })
+      });
+      const json = await response.json();
+      if (json.status === 'success') {
+        if (badgeEl) {
+          badgeEl.className = 'save-status-badge';
+          badgeEl.innerText = '✓ 自動保存済';
+        }
+      } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+        triggerReauthWithState({ screen: 'staffInventory' });
+      } else {
+        if (badgeEl) {
+          badgeEl.className = 'save-status-badge error';
+          badgeEl.innerText = '⚠️ 保存失敗';
+        }
+        alert('保存に失敗しました: ' + (json.message || ''));
+      }
+    } catch (e) {
+      if (badgeEl) {
+        badgeEl.className = 'save-status-badge error';
+        badgeEl.innerText = '⚠️ 通信エラー';
+      }
+    }
+  }
+
+  function renderStaffInventoryScreen() {
+    // 全施設の要補充件数をカウント
+    let totalShortageCount = 0;
+    FACILITY_LIST.forEach(fac => {
+      const facData = inventoryCache[fac] || {};
+      INVENTORY_SECTIONS.forEach(sec => {
+        getFacilityItemsForSection(sec, fac).forEach(item => {
+          if (isItemShortage(item, facData[item.key])) totalShortageCount++;
+        });
+      });
+    });
+
+    const tabsHtml = `
+      <div class="inv-tabs">
+        <button class="inv-tab-btn ${currentInvTab === 'LUONTO' ? 'active' : ''}" data-tab="LUONTO">LUONTO</button>
+        <button class="inv-tab-btn ${currentInvTab === 'kukka' ? 'active' : ''}" data-tab="kukka">kukka</button>
+        <button class="inv-tab-btn ${currentInvTab === 'sch-sch' ? 'active' : ''}" data-tab="sch-sch">sch-sch</button>
+        <button class="inv-tab-btn ${currentInvTab === 'ホッポッタ' ? 'active' : ''}" data-tab="ホッポッタ">ホッポッタ</button>
+        <button class="inv-tab-btn ${currentInvTab === 'COMMON' ? 'active' : ''}" data-tab="COMMON">施設共通</button>
+        <button class="inv-tab-btn shortage-tab ${currentInvTab === 'SHORTAGE' ? 'active' : ''}" data-tab="SHORTAGE">
+          🛒要補充(${totalShortageCount})
+        </button>
+      </div>
+    `;
+
+    let bodyHtml = '';
+    if (currentInvTab === 'SHORTAGE') {
+      bodyHtml = renderShortageSummaryHtml();
+    } else if (currentInvTab === 'COMMON') {
+      bodyHtml = renderCommonEquipmentHtml();
+    } else {
+      bodyHtml = renderFacilityInventoryHtml(currentInvTab);
+    }
+
+    appContent.innerHTML = `
+      <div class="staff-header-bar">
+        <h3 class="staff-title">🔧 貸別荘 備品在庫管理</h3>
+        <span id="inv-save-badge" class="save-status-badge">✓ 自動保存ON</span>
+      </div>
+      ${tabsHtml}
+      <div id="inv-main-body">${bodyHtml}</div>
+      <div style="margin-top: 18px; display: flex; gap: 8px;">
+        <button class="btn btn-secondary" id="btn-inv-reload" style="margin-bottom:0; padding:12px;">🔄 最新再取得</button>
+        <button class="btn btn-secondary" id="btn-inv-back" style="margin-bottom:0; padding:12px;">ゲスト画面へ戻る</button>
+      </div>
+    `;
+
+    // タブ切替イベント
+    document.querySelectorAll('.inv-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        currentInvTab = e.currentTarget.getAttribute('data-tab');
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // アコーディオン開閉イベント
+    document.querySelectorAll('.inv-sec-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        const secId = e.currentTarget.getAttribute('data-sec-id');
+        const mapKey = `${currentInvTab}_${secId}`;
+        openSectionsMap[mapKey] = !openSectionsMap[mapKey];
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // タイル型ラジオボタン（多/中/少/極小、および共通備品の所在施設）クリックイベント
+    document.querySelectorAll('.inv-seg-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const val = e.currentTarget.getAttribute('data-val');
+        const today = getTodayDateString();
+        autoSaveInventoryItem(fac, key, val, today);
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // 実数ステッパー（－ / ＋）クリックイベント
+    document.querySelectorAll('.inv-step-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const delta = parseInt(e.currentTarget.getAttribute('data-delta'), 10);
+        const curEntry = (inventoryCache[fac] && inventoryCache[fac][key]) ? inventoryCache[fac][key] : { v: 0 };
+        const curNum = parseInt(curEntry.v, 10) || 0;
+        const nextNum = Math.max(0, curNum + delta);
+        const today = getTodayDateString();
+        autoSaveInventoryItem(fac, key, nextNum, today);
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // 実数直接入力イベント
+    document.querySelectorAll('.inv-num-input').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const nextNum = Math.max(0, parseInt(e.currentTarget.value, 10) || 0);
+        const today = getTodayDateString();
+        autoSaveInventoryItem(fac, key, nextNum, today);
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // 「本日」ボタン（値は変えずに確認日だけを今日に更新）
+    document.querySelectorAll('.inv-today-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const curEntry = (inventoryCache[fac] && inventoryCache[fac][key]) ? inventoryCache[fac][key] : { v: '' };
+        const today = getTodayDateString();
+        autoSaveInventoryItem(fac, key, curEntry.v, today);
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // 日付の手入力カレンダー変更イベント
+    document.querySelectorAll('.inv-date-input').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const newDate = e.currentTarget.value;
+        if (!newDate) return;
+        const curEntry = (inventoryCache[fac] && inventoryCache[fac][key]) ? inventoryCache[fac][key] : { v: '' };
+        autoSaveInventoryItem(fac, key, curEntry.v, newDate);
+        renderStaffInventoryScreen();
+      });
+    });
+
+    document.getElementById('btn-inv-reload').addEventListener('click', openStaffInventoryApp);
+    document.getElementById('btn-inv-back').addEventListener('click', renderTopMenu);
+  }
+
+  // 各施設（LUONTO / kukka / sch-sch / ホッポッタ）のサブセクション別HTML生成
+  function renderFacilityInventoryHtml(facilityName) {
+    const facData = inventoryCache[facilityName] || {};
+    let html = '';
+
+    INVENTORY_SECTIONS.forEach(sec => {
+      const items = getFacilityItemsForSection(sec, facilityName);
+      if (items.length === 0) return;
+
+      let shortageCount = 0;
+      items.forEach(item => {
+        if (isItemShortage(item, facData[item.key])) shortageCount++;
+      });
+
+      const mapKey = `${facilityName}_${sec.id}`;
+      const isOpen = Boolean(openSectionsMap[mapKey]);
+      const arrow = isOpen ? '▼' : '▶';
+      const badgeHtml = shortageCount > 0
+        ? `<span class="badge-warn">⚠️ 要補充 ${shortageCount}</span>`
+        : `<span class="badge-ok">${items.length}品目</span>`;
+
+      let itemsHtml = '';
+      if (isOpen) {
+        items.forEach(item => {
+          itemsHtml += renderSingleInventoryItemHtml(facilityName, item, facData[item.key]);
+        });
+      }
+
+      html += `
+        <div class="inv-section">
+          <button type="button" class="inv-sec-header" data-sec-id="${sec.id}">
+            <span>${arrow} ${escapeHtml(sec.title)}</span>
+            <div class="inv-sec-badges">${badgeHtml}</div>
+          </button>
+          <div class="inv-sec-body ${isOpen ? '' : 'hidden'}">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    return html;
+  }
+
+  // 個別備品1行分のHTML生成（4段階・2段階・実数 ＋ 最終確認日＆本日ボタン）
+  function renderSingleInventoryItemHtml(facilityName, item, entry) {
+    const curVal = (entry && entry.v !== undefined) ? entry.v : '';
+    const curDate = (entry && entry.d) ? entry.d : '';
+    const unitLabel = item.unit ? `<span class="inv-item-unit">（単位：${escapeHtml(item.unit)}）</span>` : '';
+
+    let controlHtml = '';
+    if (item.type === '4level') {
+      const opts = [
+        { label: '多', cls: 'sel-good' },
+        { label: '中', cls: 'sel-mid' },
+        { label: '少', cls: 'sel-low' },
+        { label: '極小', cls: 'sel-crit' }
+      ];
+      controlHtml = `<div class="inv-seg-group">` + opts.map(o => {
+        const activeCls = (curVal === o.label) ? o.cls : '';
+        return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-val="${o.label}">${o.label}</button>`;
+      }).join('') + `</div>`;
+    } else if (item.type === '2level') {
+      const opts = [
+        { label: '多', cls: 'sel-good' },
+        { label: '少', cls: 'sel-low' }
+      ];
+      controlHtml = `<div class="inv-seg-group">` + opts.map(o => {
+        const activeCls = (curVal === o.label) ? o.cls : '';
+        return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-val="${o.label}">${o.label}</button>`;
+      }).join('') + `</div>`;
+    } else if (item.type === 'number') {
+      const numVal = (curVal !== '' && !isNaN(parseInt(curVal, 10))) ? parseInt(curVal, 10) : 0;
+      controlHtml = `
+        <div class="inv-num-group">
+          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="-1">－</button>
+          <input type="number" class="inv-num-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${numVal}" min="0">
+          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="1">＋</button>
+          <span style="font-size:12px; color:#555;">${escapeHtml(item.unit || '')}</span>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="inv-item">
+        <div class="inv-item-top">
+          <span class="inv-item-name">${escapeHtml(item.name)}${unitLabel}</span>
+        </div>
+        ${controlHtml}
+        <div class="inv-date-row">
+          <span>最終確認:</span>
+          <input type="date" class="inv-date-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${escapeHtml(curDate)}">
+          <button type="button" class="inv-today-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}">本日</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // 施設共通（ベビーチェア4台・ベビーベッド2台）のHTML生成
+  function renderCommonEquipmentHtml() {
+    const commonData = inventoryCache['COMMON'] || {};
+    let html = '';
+
+    COMMON_EQUIPMENT_SECTIONS.forEach(sec => {
+      let itemsHtml = '';
+      sec.items.forEach(item => {
+        const entry = commonData[item.key] || {};
+        const curFac = entry.v || '';
+        const curDate = entry.d || '';
+
+        const locBtns = FACILITY_LIST.map(facName => {
+          const activeCls = (curFac === facName) ? 'sel-loc' : '';
+          return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="COMMON" data-key="${item.key}" data-val="${escapeHtml(facName)}" style="font-size:11px;">${escapeHtml(facName)}</button>`;
+        }).join('');
+
+        itemsHtml += `
+          <div class="inv-item">
+            <div class="inv-item-top">
+              <span class="inv-item-name">${escapeHtml(item.name)}</span>
+            </div>
+            <div class="inv-seg-group">${locBtns}</div>
+            <div class="inv-date-row">
+              <span>最終確認:</span>
+              <input type="date" class="inv-date-input" data-fac="COMMON" data-key="${item.key}" value="${escapeHtml(curDate)}">
+              <button type="button" class="inv-today-btn" data-fac="COMMON" data-key="${item.key}">本日</button>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+        <div class="inv-section">
+          <div class="inv-sec-header" style="cursor:default;">
+            <span>${escapeHtml(sec.title)}</span>
+          </div>
+          <div class="inv-sec-body">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    return html;
+  }
+
+  // 🛒 要補充まとめ（全施設横断リスト・その場で更新も可能）
+  function renderShortageSummaryHtml() {
+    let html = '';
+    let anyShortage = false;
+
+    FACILITY_LIST.forEach(fac => {
+      const facData = inventoryCache[fac] || {};
+      const shortageItems = [];
+
+      INVENTORY_SECTIONS.forEach(sec => {
+        getFacilityItemsForSection(sec, fac).forEach(item => {
+          if (isItemShortage(item, facData[item.key])) {
+            shortageItems.push(item);
+          }
+        });
+      });
+
+      if (shortageItems.length > 0) {
+        anyShortage = true;
+        html += `<div class="shortage-fac-title">🏠 ${escapeHtml(fac)} （要補充: ${shortageItems.length}件）</div>`;
+        shortageItems.forEach(item => {
+          html += `<div class="shortage-card">${renderSingleInventoryItemHtml(fac, item, facData[item.key])}</div>`;
+        });
+      }
+    });
+
+    if (!anyShortage) {
+      html = `
+        <div style="text-align:center; padding:25px 10px; color:#2e7d32; background:#f1f8e9; border-radius:8px; font-size:14px;">
+          ✅ 現在「少」「極小」（または残り1以下）になっている要補充品目はありません。
+        </div>
+      `;
+    }
+
+    return html;
   }
 
   // ==========================================
