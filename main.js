@@ -13,78 +13,88 @@ document.addEventListener('DOMContentLoaded', async () => {
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
 
   // ==========================================
-  // ★ 備品マスタ定義（全39品目・6カテゴリ ＋ 施設共通2種6個体）
+  // ★ 備品マスタ定義（場所優先6カテゴリ＋袋類独立 ＋ 施設共通2種7個体）
   // ==========================================
   const INVENTORY_SECTIONS = [
     {
-      id: 'sec_towel_bed',
-      title: '① タオル・寝具類',
+      id: 'sec_linen_towel',
+      title: '① 寝具・タオル・サウナ類',
       items: [
+        { key: 'single_sheet_kake', name: 'シングルシーツ(掛け)', type: '4level', facilities: 'ALL' },
+        { key: 'single_sheet_shiki', name: 'シングルシーツ(敷)', type: '4level', facilities: 'ALL' },
+        { key: 'double_sheet_kake', name: 'ダブルシーツ(掛け)', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
+        { key: 'double_sheet_shiki', name: 'ダブルシーツ(敷)', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
+        { key: 'pillow_cover', name: '枕カバー', type: '4level', facilities: 'ALL' },
         { key: 'bath_towel', name: 'バスタオル', type: '4level', facilities: 'ALL' },
+        { key: 'body_towel', name: 'ボディタオル', type: '4level', facilities: 'ALL' },
+        { key: 'bath_mat', name: '足ふきマット', type: '4level', facilities: 'ALL' },
         { key: 'sauna_towel', name: 'サウナ用タオル', type: '4level', facilities: 'ALL' },
         { key: 'sauna_mat', name: 'サウナ用マット', type: '4level', facilities: 'ALL' },
-        { key: 'sauna_pants', name: 'サウナ用パンツ', type: '4level', facilities: ['LUONTO', 'kukka'] },
-        { key: 'body_towel', name: 'ボディタオル', type: '4level', facilities: 'ALL' },
-        { key: 'single_sheet', name: 'シングルシーツ', type: '4level', facilities: 'ALL' },
-        { key: 'double_sheet', name: 'ダブルシーツ', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
-        { key: 'bath_mat', name: '足ふきマット', type: '4level', facilities: 'ALL' },
-        { key: 'pillow_cover', name: '枕カバー', type: '4level', facilities: 'ALL' }
+        { key: 'sauna_pants', name: 'サウナ用パンツ', type: '4level', facilities: ['LUONTO', 'kukka'] }
       ]
     },
     {
       id: 'sec_wash_bath',
-      title: '② 洗面所・バス用品',
+      title: '② 洗面所・バス・ランドリー',
       items: [
         { key: 'toothbrush', name: '歯ブラシ', type: '4level', facilities: 'ALL' },
         { key: 'body_sponge', name: 'ボディスポンジ', type: '4level', facilities: 'ALL' },
         { key: 'hair_brush', name: 'ヘアブラシ', type: '4level', facilities: ['LUONTO', 'kukka'] },
         { key: 'wash_handsoap', name: '洗面所用ハンドソープ', type: '2level', facilities: 'ALL' },
+        { key: 'paper_towel_hard', name: '手拭き用ペーパータオル(硬)', type: '4level', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
         { key: 'shampoo', name: 'シャンプー', type: '2level', facilities: 'ALL' },
         { key: 'conditioner', name: 'コンディショナー', type: '2level', facilities: 'ALL' },
         { key: 'body_soap', name: 'ボディソープ', type: '2level', facilities: 'ALL' },
         { key: 'cleansing', name: 'クレンジング', type: '2level', facilities: 'ALL' },
-        { key: 'laundry_bag', name: '洗面所洗濯物用ビニール袋', type: '4level', facilities: 'ALL' }
+        { key: 'bath_detergent', name: '風呂用洗剤', type: '2level', facilities: 'ALL' },
+        { key: 'laundry_detergent', name: '洗濯用洗剤', type: '2level', facilities: 'ALL' }
       ]
     },
     {
       id: 'sec_kitchen_cafe',
-      title: '③ キッチン・カフェ用品',
+      title: '③ キッチン・カフェ・調味料',
       items: [
+        { key: 'kitchen_hand_towel', name: 'キッチン用お手拭きタオル', type: '2level', facilities: 'ALL' },
+        { key: 'kitchen_dish_cloth', name: 'キッチン用食器拭き', type: '2level', facilities: 'ALL' },
+        { key: 'dish_dry_mat', name: '食器乾燥エリア用マット', type: '2level', facilities: 'ALL' },
         { key: 'dish_detergent', name: '食器洗い洗剤', type: '2level', facilities: 'ALL' },
         { key: 'kitchen_handsoap', name: 'キッチン用ハンドソープ', type: '2level', facilities: 'ALL' },
         { key: 'dish_sponge', name: '食器洗い用スポンジ', type: '4level', facilities: 'ALL' },
         { key: 'kitchen_net', name: 'キッチンネット', type: '4level', facilities: 'ALL' },
+        { key: 'nonwoven_towel', name: '不織布タオル', type: '4level', facilities: 'ALL' },
         { key: 'kitchen_paper', name: 'キッチンペーパー', type: '4level', facilities: 'ALL' },
         { key: 'saran_wrap', name: 'サランラップ', type: '4level', facilities: 'ALL' },
-        { key: 'nonwoven_towel', name: '不織布タオル', type: '4level', facilities: 'ALL' },
+        { key: 'aluminum_foil', name: 'アルミホイル', type: '2level', facilities: 'ALL' },
+        { key: 'salt', name: '塩', type: '2level', facilities: 'ALL' },
+        { key: 'pepper', name: '胡椒', type: '2level', facilities: 'ALL' },
         { key: 'coffee_beans', name: 'コーヒー豆', type: '2level', facilities: 'ALL' },
         { key: 'black_tea', name: '紅茶', type: '2level', facilities: 'ALL' }
       ]
     },
     {
-      id: 'sec_toilet_clean',
-      title: '④ トイレ・清掃・洗濯消耗品',
+      id: 'sec_toilet_room',
+      title: '④ トイレ・室内・清掃用品',
       items: [
         { key: 'toilet_paper', name: 'トイレットペーパー', type: 'number', unit: '残りロール数', facilities: 'ALL' },
         { key: 'toilet_towel', name: 'トイレ用タオル', type: '2level', facilities: ['kukka', 'sch-sch'] },
-        { key: 'toilet_wiper', name: 'トイレ用ワイパー', type: 'number', unit: '残りパック数', facilities: 'ALL' },
-        { key: 'toilet_detergent', name: '便器用洗剤(便器掃除用)', type: '2level', facilities: 'ALL' },
-        { key: 'bath_detergent', name: '風呂用洗剤', type: '2level', facilities: 'ALL' },
-        { key: 'laundry_detergent', name: '洗濯用洗剤', type: '2level', facilities: 'ALL' },
+        { key: 'toilet_wiper', name: 'トイレ用掃除シート', type: 'number', unit: '残りパック数', facilities: 'ALL' },
+        { key: 'toilet_detergent', name: '便器用洗剤(装着型ブラシ)', type: '2level', facilities: 'ALL' },
         { key: 'vinyl_gloves', name: 'ビニール手袋', type: '2level', facilities: 'ALL' },
         { key: 'tissue', name: 'ティッシュ', type: '4level', facilities: 'ALL' },
         { key: 'slippers', name: 'スリッパ', type: '2level', facilities: 'ALL' }
       ]
     },
     {
-      id: 'sec_garbage',
-      title: '⑤ 指定ゴミ袋類',
+      id: 'sec_bags',
+      title: '⑤ 袋類（ゴミ袋・ランドリー袋）',
       items: [
         { key: 'garbage_burn_xl', name: '指定ゴミ袋可燃特大', type: '4level', facilities: 'ALL' },
         { key: 'garbage_burn_l', name: '指定ゴミ袋可燃大', type: '4level', facilities: 'ALL' },
         { key: 'garbage_burn_s', name: '指定ゴミ袋可燃小', type: '4level', facilities: 'ALL' },
         { key: 'garbage_nonburn_l', name: '指定ゴミ袋ビンカン不燃大', type: '4level', facilities: 'ALL' },
-        { key: 'garbage_nonburn_s', name: '指定ゴミ袋ビンカン不燃小', type: '4level', facilities: 'ALL' }
+        { key: 'garbage_nonburn_s', name: '指定ゴミ袋ビンカン不燃小', type: '4level', facilities: 'ALL' },
+        { key: 'laundry_bag', name: 'クリーニング用45Lゴミ袋', type: '4level', facilities: 'ALL' },
+        { key: 'washroom_bag_30l', name: '洗面所用ゴミ袋30L', type: '2level', facilities: 'ALL' }
       ]
     },
     {
@@ -92,7 +102,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       title: '⑥ BBQ用品',
       items: [
         { key: 'bbq_igniter', name: 'BBQ着火剤', type: '2level', facilities: 'ALL' },
-        { key: 'bbq_charcoal', name: 'BBQ炭', type: 'number', unit: '箱数', facilities: 'ALL' },
+        { key: 'bbq_lighter', name: 'BBQ用チャッカマン', type: '2level', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
+        { key: 'bbq_charcoal', name: 'BBQ炭', type: 'number', unit: '箱数', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
         { key: 'bbq_plate_l', name: 'BBQ紙皿大', type: '2level', facilities: 'ALL' },
         { key: 'bbq_plate_s', name: 'BBQ紙皿小', type: '2level', facilities: 'ALL' },
         { key: 'bbq_chopsticks', name: 'BBQ割りばし', type: '2level', facilities: 'ALL' },
@@ -104,20 +115,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const COMMON_EQUIPMENT_SECTIONS = [
     {
       id: 'common_baby_chair',
-      title: '🪑 ベビーチェア（計4台・所在施設）',
+      title: '🪑 ベビーチェア（計5台・所在施設）',
       items: [
         { key: 'chair_swing', name: '① スイング式' },
-        { key: 'chair_disney', name: '② ディズニー' },
-        { key: 'chair_ikea1', name: '③ IKEA(1)' },
-        { key: 'chair_ikea2', name: '④ IKEA(2)' }
+        { key: 'chair_disney1', name: '② ディズニー(1)' },
+        { key: 'chair_disney2', name: '③ ディズニー(2)' },
+        { key: 'chair_ikea1', name: '④ IKEA(1)' },
+        { key: 'chair_ikea2', name: '⑤ IKEA(2)' }
       ]
     },
     {
       id: 'common_baby_bed',
       title: '🛏️ ベビーベッド（計2台・所在施設）',
       items: [
-        { key: 'bed_easy', name: '① 組み立て簡単' },
-        { key: 'bed_hard', name: '② 組み立て難' }
+        { key: 'bed_easy', name: '① 茶' },
+        { key: 'bed_hard', name: '② 白' }
       ]
     }
   ];
@@ -508,6 +520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.inv-sec-header').forEach(header => {
       header.addEventListener('click', (e) => {
         const secId = e.currentTarget.getAttribute('data-sec-id');
+        if (!secId) return;
         const mapKey = `${currentInvTab}_${secId}`;
         openSectionsMap[mapKey] = !openSectionsMap[mapKey];
         renderStaffInventoryScreen();
@@ -680,7 +693,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // 施設共通（ベビーチェア4台・ベビーベッド2台）のHTML生成
+  // 施設共通（ベビーチェア5台・ベビーベッド2台）のHTML生成
   function renderCommonEquipmentHtml() {
     const commonData = inventoryCache['COMMON'] || {};
     let html = '';
