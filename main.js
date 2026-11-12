@@ -168,6 +168,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#39;');
   }
 
+  // ★ 選択中の言語に応じた敬称付き表示名を生成（Webアプリ版と完全統一）
+  function formatGuestDisplayName(rawName) {
+    if (!rawName) return '';
+    const formatStr = t('honorificFormat') || '{name}';
+    return formatStr.replace('{name}', () => rawName);
+  }
+
   function getLocalizedFacilityName(name) {
     let facId = null;
     for (const lang in APP_CONFIG.facilities) {
@@ -913,7 +920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層③〜】宿泊ゲスト向けフロー
+  // 【階層③〜】宿泊ゲスト向けフロー（多言語敬称・出力メッセージ統一済）
   // ==========================================
   function renderGuestNameForm() {
     const savedName = localStorage.getItem('guest_name') || '';
@@ -939,9 +946,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestFacilitySelect(guestName) {
+    const guestDisplayName = formatGuestDisplayName(guestName);
     let html = `
       ${renderLangSelectorHtml()}
-      <h2>${escapeHtml(guestName)} 様<br>${t('selectFacility')}</h2>
+      <h2>${escapeHtml(guestDisplayName)}<br>${t('selectFacility')}</h2>
     `;
 
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
@@ -964,10 +972,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderGuestActionMenu(guestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
+    const guestDisplayName = formatGuestDisplayName(guestName);
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestName)} 様<br>----<br>${t('selectGuestMenu')}</h2>
+      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestDisplayName)}<br>----<br>${t('selectGuestMenu')}</h2>
       <button class="btn btn-primary" id="btn-checkinout">${t('checkinout')}</button>
       <button class="btn btn-primary" id="btn-survey">${t('survey')}</button>
       <button class="btn btn-primary" id="btn-contact">${t('contact')}</button>
@@ -985,10 +994,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderCheckInOutAction(guestName, facilityName) {
     const locFacName = getLocalizedFacilityName(facilityName);
+    const guestDisplayName = formatGuestDisplayName(guestName);
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
-      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestName)} 様<br>${t('selectAction')}</h2>
+      <h2>【${escapeHtml(locFacName)}】<br>${escapeHtml(guestDisplayName)}<br>${t('selectAction')}</h2>
       <button class="btn btn-primary" id="btn-in">${t('checkInBtn')}</button>
       <button class="btn btn-primary" id="btn-out">${t('checkOutBtn')}</button>
       <button class="btn btn-secondary" id="btn-back">${t('back')}</button>
@@ -996,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderCheckInOutAction, guestName, facilityName);
 
     const submitAction = async (actionText, actionLogText) => {
-      const confirmMsg = `【${locFacName}】\n${guestName} 様\n\n「${actionText}」\n\n${t('confirmSend')}`;
+      const confirmMsg = `【${locFacName}】\n${guestDisplayName}\n\n「${actionText}」\n\n${t('confirmSend')}`;
       if (!confirm(confirmMsg)) return;
 
       loading.innerText = t('loading');
@@ -1016,14 +1026,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => guestName);
+            // 日本語辞書には「{name}様」と既に様が入っているため二重敬称を防止し、他言語では敬称付き名を差し込む
+            const welcomeName = (currentLang === 'ja') ? guestName : guestDisplayName;
+            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => welcomeName);
             const msgSupport = t('ci_msg_support');
             alert(`${msgWelcome}\n\n${msgSupport}`);
           } else {
             alert(`${t('ci_msg_staff_contact')}\n\n${t('ci_msg_wifi')}\n\n${t('ci_msg_contact_method')}`);
           }
         } else {
-          alert(t('sendSuccess'));
+          // チェックアウト完了時もWebアプリ版と同じ多言語メッセージを出力
+          alert(t('co_msg_success'));
         }
         renderGuestActionMenu(guestName, facilityName);
       } else if (res.code === 'MAINTENANCE') {
@@ -1076,8 +1089,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!text) return alert(t('inquiryAlert'));
 
       const locFacName = getLocalizedFacilityName(facilityName);
+      const guestDisplayName = formatGuestDisplayName(guestName);
       const messageToChat = `【${categoryName}】\n施設：${locFacName}\nお名前：${guestName} 様\n\n${text}`;
-      const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
+      const confirmPreview = `【${categoryName}】\n${locFacName}\n${guestDisplayName}\n\n${text}`;
+      const confirmMsg = `${t('confirmSend')}\n\n${confirmPreview}`;
       if (!confirm(confirmMsg)) return;
 
       try {
@@ -1251,8 +1266,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = document.getElementById('inquiry-text').value.trim();
       if (!name || !text) return alert(t('inquiryAlert'));
 
+      const guestDisplayName = formatGuestDisplayName(name);
       const messageToChat = `【${categoryName}】\nお名前：${name} 様\n\n${text}`;
-      const confirmMsg = `${t('confirmSend')}\n\n${messageToChat}`;
+      const confirmPreview = `【${categoryName}】\n${guestDisplayName}\n\n${text}`;
+      const confirmMsg = `${t('confirmSend')}\n\n${confirmPreview}`;
       if (!confirm(confirmMsg)) return;
 
       try {

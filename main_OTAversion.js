@@ -496,7 +496,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
-            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => guestDisplayName);
+            // 日本語辞書には「{name}様」と既に様が入っているため二重敬称（「様様」）を防止
+            const welcomeName = (currentLang === 'ja') ? rawGuestName : guestDisplayName;
+            msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => welcomeName);
             const msgSupport = t('ci_msg_support');
             alert(msgWelcome + '\n\n' + msgSupport);
           } else {
@@ -560,8 +562,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!text) return alert(t('inquiryAlert'));
 
       const locFacName = getLocalizedFacilityName(facilityName);
-      const messageToChat = '【' + categoryName + '】\n施設：' + locFacName + '\nお名前：' + rawGuestName + ' 様\n\n' + text;
-      const confirmMsg = t('confirmSend') + '\n\n' + messageToChat;
+      const guestDisplayName = formatGuestDisplayName(rawGuestName);
+      const confirmPreview = '【' + categoryName + '】\n' + locFacName + '\n' + guestDisplayName + '\n\n' + text;
+      const confirmMsg = t('confirmSend') + '\n\n' + confirmPreview;
       if (!confirm(confirmMsg)) return;
 
       loading.innerText = t('loading');
