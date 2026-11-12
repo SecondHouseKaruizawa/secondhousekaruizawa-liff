@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentInvTab = 'LUONTO'; // 'SHORTAGE' | 'LUONTO' | 'kukka' | 'sch-sch' | 'ホッポッタ' | 'COMMON'
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
 
+  // ★ 連打時の通信追い越し防止用（品目別デバウンスタイマー＆通信中カウンタ）
+  const saveDebounceTimers = {};
+  let inFlightSaveCount = 0;
+
   // ==========================================
   // ★ 備品マスタ定義（全50品目・場所優先6カテゴリ ＋ 施設共通2種7個体）
   // ==========================================
@@ -410,56 +414,80 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // サーバーへ1品目の更新を非同期オートセーブする関数
-  async function autoSaveInventoryItem(facilityKey, itemKey, newVal, newDate) {
+  // 保存ステータスバッジの表示を更新するヘルパー
+  function updateSaveStatusBadge(state, text) {
+    const badgeEl = document.getElementById('inv-save-badge');
+    if (!badgeEl) return;
+    if (state === 'saving') {
+      badgeEl.className = 'save-status-badge saving';
+      badgeEl.innerText = text || '⏳ 保存中...';
+    } else if (state === 'error') {
+      badgeEl.className = 'save-status-badge error';
+      badgeEl.innerText = text || '⚠️ 保存失敗';
+    } else {
+      badgeEl.className = 'save-status-badge';
+      badgeEl.innerText = text || '✓ 自動保存済';
+    }
+  }
+
+  // サーバーへ1品目の更新を非同期オートセーブする関数（450msデバウンスで連打時の通信追い越しを防止）
+  function autoSaveInventoryItem(facilityKey, itemKey, newVal, newDate) {
     if (!inventoryCache[facilityKey]) inventoryCache[facilityKey] = {};
     inventoryCache[facilityKey][itemKey] = { v: newVal, d: newDate };
 
-    const badgeEl = document.getElementById('inv-save-badge');
-    if (badgeEl) {
-      badgeEl.className = 'save-status-badge saving';
-      badgeEl.innerText = '⏳ 保存中...';
+    updateSaveStatusBadge('saving', '⏳ 保存中...');
+
+    const timerKey = `${facilityKey}__${itemKey}`;
+    if (saveDebounceTimers[timerKey]) {
+      clearTimeout(saveDebounceTimers[timerKey]);
     }
 
-    const idToken = liff.getIDToken();
-    if (!idToken) {
-      triggerReauthWithState({ screen: 'staffInventory' });
-      return;
-    }
+    saveDebounceTimers[timerKey] = setTimeout(async () => {
+      delete saveDebounceTimers[timerKey];
 
-    try {
-      const response = await fetch(APP_CONFIG.GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'inv_update',
-          idToken: idToken,
-          facility: facilityKey,
-          itemKey: itemKey,
-          value: newVal,
-          date: newDate
-        })
-      });
-      const json = await response.json();
-      if (json.status === 'success') {
-        if (badgeEl) {
-          badgeEl.className = 'save-status-badge';
-          badgeEl.innerText = '✓ 自動保存済';
-        }
-      } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+      const idToken = liff.getIDToken();
+      if (!idToken) {
         triggerReauthWithState({ screen: 'staffInventory' });
-      } else {
-        if (badgeEl) {
-          badgeEl.className = 'save-status-badge error';
-          badgeEl.innerText = '⚠️ 保存失敗';
+        return;
+      }
+
+      const latestEntry = (inventoryCache[facilityKey] && inventoryCache[facilityKey][itemKey])
+        ? inventoryCache[facilityKey][itemKey]
+        : { v: newVal, d: newDate };
+
+      inFlightSaveCount++;
+      updateSaveStatusBadge('saving', '⏳ 保存中...');
+
+      try {
+        const response = await fetch(APP_CONFIG.GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            type: 'inv_update',
+            idToken: idToken,
+            facility: facilityKey,
+            itemKey: itemKey,
+            value: latestEntry.v,
+            date: latestEntry.d
+          })
+        });
+        const json = await response.json();
+        inFlightSaveCount = Math.max(0, inFlightSaveCount - 1);
+
+        if (json.status === 'success') {
+          if (inFlightSaveCount === 0 && Object.keys(saveDebounceTimers).length === 0) {
+            updateSaveStatusBadge('ok', '✓ 自動保存済');
+          }
+        } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+          triggerReauthWithState({ screen: 'staffInventory' });
+        } else {
+          updateSaveStatusBadge('error', '⚠️ 保存失敗');
+          alert('保存に失敗しました: ' + (json.message || ''));
         }
-        alert('保存に失敗しました: ' + (json.message || ''));
+      } catch (e) {
+        inFlightSaveCount = Math.max(0, inFlightSaveCount - 1);
+        updateSaveStatusBadge('error', '⚠️ 通信エラー');
       }
-    } catch (e) {
-      if (badgeEl) {
-        badgeEl.className = 'save-status-badge error';
-        badgeEl.innerText = '⚠️ 通信エラー';
-      }
-    }
+    }, 450);
   }
 
   function renderStaffInventoryScreen() {
@@ -473,6 +501,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       });
     });
+
+    const isSavingNow = inFlightSaveCount > 0 || Object.keys(saveDebounceTimers).length > 0;
+    const badgeClass = isSavingNow ? 'save-status-badge saving' : 'save-status-badge';
+    const badgeText = isSavingNow ? '⏳ 保存中...' : '✓ 自動保存ON';
 
     const tabsHtml = `
       <div class="inv-tabs">
@@ -499,7 +531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContent.innerHTML = `
       <div class="staff-header-bar">
         <h3 class="staff-title">🔧 貸別荘 備品在庫管理</h3>
-        <span id="inv-save-badge" class="save-status-badge">✓ 自動保存ON</span>
+        <span id="inv-save-badge" class="${badgeClass}">${badgeText}</span>
       </div>
       ${tabsHtml}
       <div id="inv-main-body">${bodyHtml}</div>
@@ -548,7 +580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const delta = parseInt(e.currentTarget.getAttribute('data-delta'), 10);
         const curEntry = (inventoryCache[fac] && inventoryCache[fac][key]) ? inventoryCache[fac][key] : { v: 0 };
         const curNum = parseInt(curEntry.v, 10) || 0;
-        const nextNum = Math.max(0, curNum + delta);
+        const nextNum = Math.max(0, Math.min(9999, curNum + delta));
         const today = getTodayDateString();
         autoSaveInventoryItem(fac, key, nextNum, today);
         renderStaffInventoryScreen();
@@ -560,7 +592,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       inp.addEventListener('change', (e) => {
         const fac = e.currentTarget.getAttribute('data-fac');
         const key = e.currentTarget.getAttribute('data-key');
-        const nextNum = Math.max(0, parseInt(e.currentTarget.value, 10) || 0);
+        const nextNum = Math.max(0, Math.min(9999, parseInt(e.currentTarget.value, 10) || 0));
         const today = getTodayDateString();
         autoSaveInventoryItem(fac, key, nextNum, today);
         renderStaffInventoryScreen();
@@ -672,7 +704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       controlHtml = `
         <div class="inv-num-group">
           <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="-1">－</button>
-          <input type="number" class="inv-num-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${numVal}" min="0">
+          <input type="number" class="inv-num-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${numVal}" min="0" max="9999">
           <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="1">＋</button>
           <span style="font-size:12px; color:#555;">${escapeHtml(item.unit || '')}</span>
         </div>
