@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
 
   // ==========================================
-  // ★ 備品マスタ定義（場所優先6カテゴリ＋袋類独立 ＋ 施設共通2種7個体）
+  // ★ 備品マスタ定義（全50品目・場所優先6カテゴリ ＋ 施設共通2種7個体）
   // ==========================================
   const INVENTORY_SECTIONS = [
     {
@@ -77,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       items: [
         { key: 'toilet_paper', name: 'トイレットペーパー', type: 'number', unit: '残りロール数', facilities: 'ALL' },
         { key: 'toilet_towel', name: 'トイレ用タオル', type: '2level', facilities: ['kukka', 'sch-sch'] },
+        { key: 'toilet_floormat', name: 'トイレ用フロアマット', type: '2level', facilities: 'ALL' },
         { key: 'toilet_wiper', name: 'トイレ用掃除シート', type: 'number', unit: '残りパック数', facilities: 'ALL' },
         { key: 'toilet_detergent', name: '便器用洗剤(装着型ブラシ)', type: '2level', facilities: 'ALL' },
         { key: 'vinyl_gloves', name: 'ビニール手袋', type: '2level', facilities: 'ALL' },
