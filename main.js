@@ -17,6 +17,173 @@ document.addEventListener('DOMContentLoaded', async () => {
   let inFlightSaveCount = 0;
 
   // ==========================================
+  // ★ 匿名行動分析（トレーサー）用 状態管理＆非同期バッファ
+  // ==========================================
+  let traceLevel = 0; // check_status でサーバー側の TRACE_LEVEL を受け取る
+  let currentTrackedFacility = 'UNSELECTED';
+  let lastTrackedStepCode = '';
+  let traceQueue = [];
+  let traceFlushTimer = null;
+
+  function getTodayDateString() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // セッションID（30分無操作で新規発行）と日跨ぎリピート判定メタデータの取得
+  function getTraceSessionAndMeta() {
+    const nowMs = Date.now();
+    const todayStr = getTodayDateString();
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+    let sessionId = localStorage.getItem('sh_liff_trace_sid') || '';
+    const lastActiveMs = parseInt(localStorage.getItem('sh_liff_trace_last_ms') || '0', 10);
+    let seqNo = parseInt(localStorage.getItem('sh_liff_trace_seq') || '0', 10);
+
+    let firstDate = localStorage.getItem('sh_liff_first_date') || '';
+    let lastDate = localStorage.getItem('sh_liff_last_date') || '';
+    let userSegment = localStorage.getItem('sh_liff_user_seg') || 'FIRST';
+
+    if (!firstDate) {
+      firstDate = todayStr;
+      localStorage.setItem('sh_liff_first_date', firstDate);
+    }
+
+    if (!sessionId || (nowMs - lastActiveMs) > SESSION_TIMEOUT_MS) {
+      sessionId = 's_' + nowMs.toString(36) + '_' + Math.random().toString(36).substring(2, 7);
+      seqNo = 0;
+      if (!lastDate) {
+        userSegment = 'FIRST';
+      } else if (lastDate === todayStr) {
+        userSegment = (firstDate !== todayStr) ? 'MULTI_DAY_REPEAT' : 'SAME_DAY_REPEAT';
+      } else {
+        userSegment = 'MULTI_DAY_REPEAT';
+      }
+      localStorage.setItem('sh_liff_trace_sid', sessionId);
+      localStorage.setItem('sh_liff_user_seg', userSegment);
+      localStorage.setItem('sh_liff_last_date', todayStr);
+    }
+
+    seqNo += 1;
+    localStorage.setItem('sh_liff_trace_seq', String(seqNo));
+    localStorage.setItem('sh_liff_trace_last_ms', String(nowMs));
+
+    let daysSinceFirst = 0;
+    try {
+      const fParts = firstDate.split('-');
+      const tParts = todayStr.split('-');
+      const fDt = new Date(parseInt(fParts[0], 10), parseInt(fParts[1], 10) - 1, parseInt(fParts[2], 10));
+      const tDt = new Date(parseInt(tParts[0], 10), parseInt(tParts[1], 10) - 1, parseInt(tParts[2], 10));
+      daysSinceFirst = Math.max(0, Math.round((tDt.getTime() - fDt.getTime()) / (1000 * 60 * 60 * 24)));
+    } catch (e) {}
+
+    return {
+      sessionId: sessionId,
+      seqNo: seqNo,
+      userSegment: userSegment,
+      daysSinceFirst: daysSinceFirst
+    };
+  }
+
+  // 画面表示（VIEW_...）および完遂アクション（GOAL_...）の記録フック
+  function trackStep(stepCode, isGoal = 0, facilityOverride = null) {
+    try {
+      if (isStaffUser || traceLevel <= 0) return;
+      if (facilityOverride) currentTrackedFacility = facilityOverride;
+
+      // TRACE_LEVEL === 1（軽量KPIモード）時はゴールイベントのみ送信
+      if (traceLevel === 1 && !isGoal) return;
+
+      // 同一画面での言語切替等による連続重複VIEWを抑制
+      if (!isGoal && stepCode === lastTrackedStepCode) return;
+      lastTrackedStepCode = stepCode;
+
+      const meta = getTraceSessionAndMeta();
+      traceQueue.push({
+        ts: Date.now(),
+        seq: meta.seqNo,
+        step: stepCode,
+        goal: isGoal ? 1 : 0,
+        fac: currentTrackedFacility || 'UNSELECTED',
+        lang: currentLang
+      });
+
+      if (isGoal) {
+        flushTraceQueue(true);
+      } else {
+        if (traceFlushTimer) clearTimeout(traceFlushTimer);
+        traceFlushTimer = setTimeout(() => flushTraceQueue(false), 3000);
+      }
+    } catch (e) {}
+  }
+
+  // バッファされた行動イベントを非同期でGASへ一括送信（UX非干渉・Fire-and-Forget）
+  function flushTraceQueue(useKeepAlive = false) {
+    try {
+      if (traceFlushTimer) {
+        clearTimeout(traceFlushTimer);
+        traceFlushTimer = null;
+      }
+      if (isStaffUser || traceLevel <= 0 || traceQueue.length === 0) return;
+
+      const idToken = (typeof liff !== 'undefined' && liff.isLoggedIn()) ? liff.getIDToken() : null;
+      if (!idToken) return;
+
+      const eventsToSend = traceQueue.slice();
+      traceQueue = [];
+
+      const sessionId = localStorage.getItem('sh_liff_trace_sid') || '';
+      const userSegment = localStorage.getItem('sh_liff_user_seg') || 'FIRST';
+      const firstDate = localStorage.getItem('sh_liff_first_date') || getTodayDateString();
+      const todayStr = getTodayDateString();
+      let daysSinceFirst = 0;
+      try {
+        const fParts = firstDate.split('-');
+        const tParts = todayStr.split('-');
+        const fDt = new Date(parseInt(fParts[0], 10), parseInt(fParts[1], 10) - 1, parseInt(fParts[2], 10));
+        const tDt = new Date(parseInt(tParts[0], 10), parseInt(tParts[1], 10) - 1, parseInt(tParts[2], 10));
+        daysSinceFirst = Math.max(0, Math.round((tDt.getTime() - fDt.getTime()) / (1000 * 60 * 60 * 24)));
+      } catch (e) {}
+
+      let tz = 'unknown';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'; } catch (e) {}
+      const osLang = navigator.language || 'unknown';
+
+      const payloadStr = JSON.stringify({
+        type: 'trace_events',
+        idToken: idToken,
+        sessionId: sessionId,
+        userSegment: userSegment,
+        daysSinceFirst: daysSinceFirst,
+        facility: currentTrackedFacility,
+        appLang: currentLang,
+        osLang: osLang,
+        timezone: tz,
+        events: eventsToSend
+      });
+
+      fetch(APP_CONFIG.GAS_URL, {
+        method: 'POST',
+        body: payloadStr,
+        keepalive: Boolean(useKeepAlive)
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  // 画面を閉じた・別アプリに切り替えた瞬間に未送信イベントを確実にフラッシュ
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushTraceQueue(true);
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    flushTraceQueue(true);
+  });
+
+  // ==========================================
   // ★ 備品マスタ定義（全50品目・場所優先6カテゴリ ＋ 施設共通2種7個体）
   // ==========================================
   const INVENTORY_SECTIONS = [
@@ -141,14 +308,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const FACILITY_LIST = ['LUONTO', 'kukka', 'sch-sch', 'ホッポッタ'];
 
-  function getTodayDateString() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
   function t(key) {
     let val = APP_CONFIG.translations[currentLang]?.[key];
     if (val !== undefined) return val;
@@ -191,6 +350,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return name;
   }
 
+  function getFacilityNameById(facId) {
+    const jaList = APP_CONFIG.facilities['ja'] || [];
+    const found = jaList.find(f => f.id === facId);
+    return found ? found.name : facId;
+  }
+
   function renderLangSelectorHtml() {
     return `
       <div class="lang-selector">
@@ -214,6 +379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function closeApp() {
+    flushTraceQueue(true);
     liff.closeWindow();
   }
 
@@ -291,6 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     isStaffUser = Boolean(result.isStaff);
     currentMyUserId = result.myUserId || '';
+    traceLevel = (!isStaffUser && typeof result.traceLevel === 'number') ? result.traceLevel : 0;
 
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -324,6 +491,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層①】TOPメニュー（スタッフのみ備品管理入口を表示）
   // ==========================================
   function renderTopMenu() {
+    trackStep('VIEW_TOP', 0);
+
     const staffBtnHtml = isStaffUser
       ? `<button class="btn btn-staff-entry" id="btn-staff-inv">🔧 スタッフ用メニュー (備品在庫管理)</button>`
       : '';
@@ -821,6 +990,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層②】宿泊ゲスト向け分岐メニュー
   // ==========================================
   function renderGuestTopMenu() {
+    trackStep('VIEW_GUEST_TOP', 0);
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('guestTopMenuPrompt')}</h2>
@@ -841,6 +1012,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層③】施設までの道案内メニュー
   // ==========================================
   function renderRouteAccessMenu() {
+    trackStep('VIEW_ROUTE_MENU', 0);
+
     let html = `
       ${renderLangSelectorHtml()}
       <h2>${t('routeAccess')}</h2>
@@ -864,6 +1037,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', (e) => {
         const facilityId = e.currentTarget.getAttribute('data-id');
         const mapUrl = APP_CONFIG.mapUrls[facilityId];
+        const facCanonical = getFacilityNameById(facilityId);
+        trackStep('GOAL_MAP', 1, facCanonical);
+
         if (mapUrl) {
           if (liff.isInClient()) {
             liff.openWindow({ url: mapUrl, external: true });
@@ -881,6 +1057,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // バーチャルツアー施設選択メニュー
   // ==========================================
   function renderVirtualTourMenu(source) {
+    trackStep('VIEW_VT_MENU', 0);
+
     let html = `
       ${renderLangSelectorHtml()}
       <h2>${t('virtualTour')}</h2>
@@ -900,6 +1078,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.addEventListener('click', (e) => {
         const facilityId = e.currentTarget.getAttribute('data-id');
         const vtUrl = APP_CONFIG.virtualTourUrls[facilityId];
+        const facCanonical = getFacilityNameById(facilityId);
+        trackStep('GOAL_VIRTUAL_TOUR', 1, facCanonical);
+
         if (vtUrl) {
           if (liff.isInClient()) {
             liff.openWindow({ url: vtUrl, external: true });
@@ -923,6 +1104,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層③〜】宿泊ゲスト向けフロー（多言語敬称・出力メッセージ統一済）
   // ==========================================
   function renderGuestNameForm() {
+    trackStep('VIEW_NAME_INPUT', 0);
+
     const savedName = localStorage.getItem('guest_name') || '';
 
     appContent.innerHTML = `
@@ -946,6 +1129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestFacilitySelect(guestName) {
+    trackStep('VIEW_FACILITY_SELECT', 0);
+
     const guestDisplayName = formatGuestDisplayName(guestName);
     let html = `
       ${renderLangSelectorHtml()}
@@ -971,6 +1156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestActionMenu(guestName, facilityName) {
+    trackStep('VIEW_GUEST_ACTION', 0, facilityName);
+
     const locFacName = getLocalizedFacilityName(facilityName);
     const guestDisplayName = formatGuestDisplayName(guestName);
 
@@ -986,6 +1173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-checkinout').addEventListener('click', () => renderCheckInOutAction(guestName, facilityName));
     document.getElementById('btn-survey').addEventListener('click', () => {
+      trackStep('GOAL_SURVEY', 1, facilityName);
       window.location.href = APP_CONFIG.surveyUrls[currentLang] || APP_CONFIG.surveyUrls['ja'];
     });
     document.getElementById('btn-contact').addEventListener('click', () => renderGuestContactCategory(guestName, facilityName));
@@ -993,6 +1181,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderCheckInOutAction(guestName, facilityName) {
+    trackStep('VIEW_CHECKINOUT_SELECT', 0, facilityName);
+
     const locFacName = getLocalizedFacilityName(facilityName);
     const guestDisplayName = formatGuestDisplayName(guestName);
 
@@ -1023,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (res.ok) {
         if (actionLogText === '到着・チェックイン(Checked-In)') {
+          trackStep('GOAL_CHECKIN', 1, facilityName);
           const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
           if (schSchHoppotta.includes(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
@@ -1035,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert(`${t('ci_msg_staff_contact')}\n\n${t('ci_msg_wifi')}\n\n${t('ci_msg_contact_method')}`);
           }
         } else {
+          trackStep('GOAL_CHECKOUT', 1, facilityName);
           // チェックアウト完了時もWebアプリ版と同じ多言語メッセージを出力
           alert(t('co_msg_success'));
         }
@@ -1052,6 +1244,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestContactCategory(guestName, facilityName) {
+    trackStep('VIEW_CONTACT_CAT', 0, facilityName);
+
     let html = `
       ${renderLangSelectorHtml()}
       <h2>${t('selectContactCat')}</h2>
@@ -1075,6 +1269,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderGuestContactForm(guestName, facilityName, categoryName, restoredText = '') {
+    trackStep('VIEW_CONTACT_FORM', 0, facilityName);
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${escapeHtml(categoryName)}</h2>
@@ -1098,6 +1294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         if (liff.isInClient()) {
           await liff.sendMessages([{ type: "text", text: messageToChat }]);
+          trackStep('GOAL_INQUIRY_GUEST', 1, facilityName);
           alert(t('inquirySuccess'));
         } else {
           loading.innerText = t('loading');
@@ -1111,6 +1308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (!res || res.reauthing) return;
 
           if (res.ok) {
+            trackStep('GOAL_INQUIRY_GUEST', 1, facilityName);
             alert(t('pcFallbackSuccess'));
           } else if (res.code === 'MAINTENANCE') {
             return renderMaintenanceScreen();
@@ -1131,6 +1329,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 【階層②〜】予約・宿泊でないお客様向けフロー
   // ==========================================
   function renderNonGuestMenu() {
+    trackStep('VIEW_NONGUEST_TOP', 0);
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('selectGuestMenu')}</h2>
@@ -1150,6 +1350,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderBookingMenu() {
+    trackStep('VIEW_BOOK_MENU', 0);
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2>${t('bookMenu')}</h2>
@@ -1174,6 +1376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!res || res.reauthing) return;
 
       if (res.ok) {
+        trackStep('GOAL_BOOK_HP', 1);
         window.location.href = APP_CONFIG.HP_BOOKING_URL;
       } else if (res.code === 'MAINTENANCE') {
         renderMaintenanceScreen();
@@ -1186,6 +1389,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderReturningBookingForm(restoredData = null) {
+    trackStep('VIEW_BOOK_RETURNING_FORM', 0);
+
     const currentFacilities = APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja'];
     let optionsHtml = '';
     currentFacilities.forEach(f => {
@@ -1238,6 +1443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!res || res.reauthing) return;
 
       if (res.ok) {
+        trackStep('GOAL_BOOK_HP', 1, facility);
         window.location.href = APP_CONFIG.HP_BOOKING_URL;
       } else if (res.code === 'MAINTENANCE') {
         renderMaintenanceScreen();
@@ -1250,6 +1456,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderNonGuestInquiryForm(restoredName = '', restoredText = '') {
+    trackStep('VIEW_NONGUEST_INQUIRY_FORM', 0);
+
     const categoryName = t('nonGuestInquiryName');
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
@@ -1275,6 +1483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         if (liff.isInClient()) {
           await liff.sendMessages([{ type: "text", text: messageToChat }]);
+          trackStep('GOAL_INQUIRY_NONGUEST', 1);
           alert(t('inquirySuccess'));
         } else {
           loading.innerText = t('loading');
@@ -1288,6 +1497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (!res || res.reauthing) return;
 
           if (res.ok) {
+            trackStep('GOAL_INQUIRY_NONGUEST', 1);
             alert(t('pcFallbackSuccess'));
           } else if (res.code === 'MAINTENANCE') {
             return renderMaintenanceScreen();
