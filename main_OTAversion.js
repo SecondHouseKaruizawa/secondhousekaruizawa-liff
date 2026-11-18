@@ -3,6 +3,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loading = document.getElementById('loading');
   const appContent = document.getElementById('app-content');
 
+  // ページタイトルを設定マスタから反映
+  if (APP_CONFIG.pageTitles && APP_CONFIG.pageTitles.ota) {
+    document.title = APP_CONFIG.pageTitles.ota;
+  }
+
+  // 契約モジュール制御フラグ（未定義時は既存互換で全機能ON）
+  const MODULES = Object.assign({
+    lineGuest: true,
+    nonGuestBooking: true,
+    otaPortal: true,
+    inventory: true,
+    analytics: true
+  }, APP_CONFIG.modules || {});
+
+  // OTA 5項目認証画面の表示・注意喚起設定（未定義時は既存互換値へフォールバック）
+  const OTA_AUTH_OPTS = Object.assign({
+    maxNights: 10,
+    maxAdults: 10,
+    channelNoticeKey: 'cotteNotice',
+    showChannelNoticeOnFocus: true,
+    alertTriggerChannelIds: ['cotte']
+  }, APP_CONFIG.otaAuthOptions || {});
+
   let currentLang = localStorage.getItem('ota_app_lang') || 'ja';
 
   let clientId = localStorage.getItem('ota_client_id');
@@ -143,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ステップ記録関数（isGoal: 0=画面遷移, 1=完遂アクション）
   function trackStep(stepCode, isGoal = 0, facilityOverride = null) {
-    if (!traceLevel || traceLevel <= 0 || adminKey) return;
+    if (!MODULES.analytics || !traceLevel || traceLevel <= 0 || adminKey) return;
     // LEVEL 1 の場合は完遂アクション(isGoal=1)およびOTA認証成否のみを記録し、中間画面遷移は省略
     const isAuthMilestone = (stepCode === 'PASS_OTA_AUTH' || stepCode === 'FAIL_OTA_AUTH');
     if (traceLevel === 1 && !isGoal && !isAuthMilestone) return;
@@ -188,7 +211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearTimeout(traceFlushTimer);
       traceFlushTimer = null;
     }
-    if (!traceLevel || traceLevel <= 0 || traceBuffer.length === 0 || adminKey) return;
+    if (!MODULES.analytics || !traceLevel || traceLevel <= 0 || traceBuffer.length === 0 || adminKey) return;
 
     const eventsToSend = traceBuffer.slice();
     traceBuffer = [];
@@ -227,7 +250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ==========================================
-  // 基本ユーティリティ関数群
+  // 基本ユーティリティ・マスタ参照ヘルパー関数群
   // ==========================================
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
@@ -253,44 +276,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     return formatStr.replace('{name}', () => rawName);
   }
 
-  function getLocalizedFacilityName(name) {
-    let facId = null;
+  // 任意の言語の施設名からマスタ定義オブジェクト（guideType等を含む）を取得
+  function getFacilityDefByName(name) {
+    if (!name || !APP_CONFIG.facilities) return null;
     for (const lang in APP_CONFIG.facilities) {
-      const fac = APP_CONFIG.facilities[lang].find(f => f.name === name);
-      if (fac) {
-        facId = fac.id;
-        break;
+      const list = APP_CONFIG.facilities[lang] || [];
+      const found = list.find(f => f.name === name);
+      if (found) {
+        const jaDef = (APP_CONFIG.facilities['ja'] || []).find(f => f.id === found.id);
+        return Object.assign({}, jaDef || {}, found);
       }
     }
-    if (facId) {
-      const localizedFac = (APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja']).find(f => f.id === facId);
+    return null;
+  }
+
+  function getLocalizedFacilityName(name) {
+    const def = getFacilityDefByName(name);
+    if (def && def.id) {
+      const localizedFac = (APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja']).find(f => f.id === def.id);
       if (localizedFac) return localizedFac.name;
     }
     return name;
   }
 
   function getCanonicalFacilityName(localizedName) {
-    if (!localizedName) return '';
-    for (const lang in APP_CONFIG.facilities) {
-      const found = APP_CONFIG.facilities[lang].find(f => f.name === localizedName);
+    const def = getFacilityDefByName(localizedName);
+    if (def && def.id) {
+      const jaFac = (APP_CONFIG.facilities['ja'] || []).find(f => f.id === def.id);
+      if (jaFac) return jaFac.name;
+    }
+    return localizedName || '';
+  }
+
+  // チェックイン完了時の案内種別判定（manual: ようこそ案内のみ / call: スタッフ連絡案内）
+  function isManualGuideFacility(name) {
+    const def = getFacilityDefByName(name);
+    return Boolean(def && def.guideType === 'manual');
+  }
+
+  function getCanonicalChannelName(localizedName) {
+    if (!localizedName || !APP_CONFIG.bookingChannels) return '';
+    for (const lang in APP_CONFIG.bookingChannels) {
+      const found = (APP_CONFIG.bookingChannels[lang] || []).find(c => c.name === localizedName);
       if (found) {
-        const jaFac = APP_CONFIG.facilities['ja'].find(f => f.id === found.id);
-        if (jaFac) return jaFac.name;
+        const jaChan = (APP_CONFIG.bookingChannels['ja'] || []).find(c => c.id === found.id);
+        if (jaChan) return jaChan.name;
       }
     }
     return localizedName;
   }
 
-  function getCanonicalChannelName(localizedName) {
-    if (!localizedName) return '';
+  function getChannelIdByName(localizedName) {
+    if (!localizedName || !APP_CONFIG.bookingChannels) return '';
     for (const lang in APP_CONFIG.bookingChannels) {
-      const found = APP_CONFIG.bookingChannels[lang].find(c => c.name === localizedName);
-      if (found) {
-        const jaChan = APP_CONFIG.bookingChannels['ja'].find(c => c.id === found.id);
-        if (jaChan) return jaChan.name;
-      }
+      const found = (APP_CONFIG.bookingChannels[lang] || []).find(c => c.name === localizedName);
+      if (found) return found.id;
     }
-    return localizedName;
+    return '';
   }
 
   function renderLangSelectorHtml() {
@@ -323,6 +365,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==========================================
   // 起動時ステータス確認（check_status）
   // ==========================================
+  if (!MODULES.otaPortal) {
+    loading.classList.add('hidden');
+    appContent.classList.remove('hidden');
+    renderMaintenanceScreen();
+    return;
+  }
+
   try {
     const response = await fetch(APP_CONFIG.GAS_URL, {
       method: 'POST',
@@ -337,7 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const result = await response.json();
 
     // サーバー側から指定されたトレース粒度（0〜3）を反映
-    traceLevel = Number(result.traceLevel || 0);
+    traceLevel = MODULES.analytics ? Number(result.traceLevel || 0) : 0;
 
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -402,15 +451,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       channelOptions += '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>';
     });
 
+    const maxNights = Math.max(1, parseInt(OTA_AUTH_OPTS.maxNights, 10) || 10);
     let nightOptions = '';
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= maxNights; i++) {
       nightOptions += '<option value="' + i + '">' + i + ' ' + (currentLang === 'ja' ? '泊' : 'night(s)') + '</option>';
     }
 
+    const maxAdults = Math.max(1, parseInt(OTA_AUTH_OPTS.maxAdults, 10) || 10);
     let adultOptions = '';
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= maxAdults; i++) {
       adultOptions += '<option value="' + i + '">' + i + ' ' + (currentLang === 'ja' ? '名' : 'adult(s)') + '</option>';
     }
+
+    const noticeKey = OTA_AUTH_OPTS.channelNoticeKey || '';
+    const channelNoticeText = noticeKey ? t(noticeKey) : '';
+    const channelTitleAttr = channelNoticeText ? ' title="' + escapeHtml(channelNoticeText) + '"' : '';
+    const channelNoticeBoxHtml = channelNoticeText
+      ? '<div id="cotte-notice-box" style="font-size: 12px; color: #d9534f; margin-top: -10px; margin-bottom: 15px; font-weight: bold; line-height: 1.4;">' + channelNoticeText + '</div>'
+      : '';
 
     appContent.innerHTML = '\
       ' + renderLangSelectorHtml() + '\
@@ -438,13 +496,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       </select>\
 \
       <label style="font-size:13px; font-weight:bold; display:block; margin-bottom:5px;">' + t('channel') + '</label>\
-      <select id="auth-channel" class="input-field" title="' + escapeHtml(t('cotteNotice')) + '">\
+      <select id="auth-channel" class="input-field"' + channelTitleAttr + '>\
         <option value="" disabled selected>' + escapeHtml(t('selectPlaceholder')) + '</option>\
         ' + channelOptions + '\
       </select>\
-      <div id="cotte-notice-box" style="font-size: 12px; color: #d9534f; margin-top: -10px; margin-bottom: 15px; font-weight: bold; line-height: 1.4;">\
-        ' + t('cotteNotice') + '\
-      </div>\
+      ' + channelNoticeBoxHtml + '\
 \
       <button class="btn btn-primary" id="btn-auth" style="margin-top: 5px;">' + t('authSubmit') + '</button>\
       \
@@ -456,19 +512,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLangSelectorEvents(renderOtaAuthForm);
 
     const channelSelect = document.getElementById('auth-channel');
-    let hasAlertedOnFocus = false;
-    channelSelect.addEventListener('focus', () => {
-      if (!hasAlertedOnFocus) {
-        alert(t('cotteNotice'));
-        hasAlertedOnFocus = true;
+    if (channelNoticeText) {
+      let hasAlertedOnFocus = false;
+      if (OTA_AUTH_OPTS.showChannelNoticeOnFocus) {
+        channelSelect.addEventListener('focus', () => {
+          if (!hasAlertedOnFocus) {
+            alert(channelNoticeText);
+            hasAlertedOnFocus = true;
+          }
+        });
       }
-    });
 
-    channelSelect.addEventListener('change', (e) => {
-      if (e.target.value === 'Cotte') {
-        alert(t('cotteNotice'));
+      const triggerIds = Array.isArray(OTA_AUTH_OPTS.alertTriggerChannelIds) ? OTA_AUTH_OPTS.alertTriggerChannelIds : [];
+      if (triggerIds.length > 0) {
+        channelSelect.addEventListener('change', (e) => {
+          const selectedChannelId = getChannelIdByName(e.target.value);
+          if (triggerIds.includes(selectedChannelId)) {
+            alert(channelNoticeText);
+          }
+        });
       }
-    });
+    }
 
     document.getElementById('btn-auth').addEventListener('click', async () => {
       const checkinDate = document.getElementById('auth-date').value;
@@ -723,8 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (res.ok) {
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           trackStep('GOAL_CHECKIN', 1, facilityName);
-          const schSchHoppotta = ['sch-sch', 'ホッポッタ', 'Hoppotta'];
-          if (schSchHoppotta.includes(facilityName)) {
+          if (isManualGuideFacility(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
             const welcomeName = (currentLang === 'ja') ? rawGuestName : guestDisplayName;
             msgWelcome = msgWelcome.replace('{facility}', () => locFacName).replace('{name}', () => welcomeName);

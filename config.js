@@ -1,35 +1,51 @@
 // config.js
 const APP_CONFIG = {
-  // ▼ 連携キーとURL
-  "LIFF_ID": "2011150909-rbXdgDNt", 
-  "GAS_URL": "https://script.google.com/macros/s/AKfycbwMfBZIxZFhA8KFYR3JF044xyGi0cJaEwojsCYkviXoUFpL3IVf_XfuT9NYcbs0HgwtQg/exec", 
-  "HP_BOOKING_URL": "https://www.schsch-secondhouse.com/contact", 
+  // ▼ テナント基本情報・ページタイトル定義
+  "brandName": "Second House 軽井沢",
+  "pageTitles": {
+    "liff": "Second House ゲストメニュー",
+    "ota": "Second House ゲストポータル"
+  },
 
-  // ▼ 施設一覧マスタ
+  // ▼ 契約モジュール制御フラグ（ばら売り・機能別ON/OFF制御用）
+  "modules": {
+    "lineGuest": true,        // 宿泊ゲスト向けメニュー（LIFF版）
+    "nonGuestBooking": true,  // 非宿泊者向けHP予約・一般問い合わせ導線（LIFF版）
+    "otaPortal": true,        // OTAゲスト用Webポータル版
+    "inventory": true,        // スタッフ専用・備品在庫管理SPA
+    "analytics": true         // 匿名行動トラッキング（トレーサー）
+  },
+
+  // ▼ 連携キーとURL
+  "LIFF_ID": "2011150909-rbXdgDNt",
+  "GAS_URL": "https://script.google.com/macros/s/AKfycbwMfBZIxZFhA8KFYR3JF044xyGi0cJaEwojsCYkviXoUFpL3IVf_XfuT9NYcbs0HgwtQg/exec",
+  "HP_BOOKING_URL": "https://www.schsch-secondhouse.com/contact",
+
+  // ▼ 施設一覧マスタ（guideType: "manual"=ようこそ案内のみ / "call"=スタッフ連絡・WiFi待機案内）
   "facilities": {
     "ja": [
-      { "id": "sc", "name": "sch-sch" },
-      { "id": "Hp", "name": "ホッポッタ" },
-      { "id": "ku", "name": "kukka" },
-      { "id": "LU", "name": "LUONTO" }
+      { "id": "sc", "name": "sch-sch", "guideType": "manual" },
+      { "id": "Hp", "name": "ホッポッタ", "guideType": "manual" },
+      { "id": "ku", "name": "kukka", "guideType": "call" },
+      { "id": "LU", "name": "LUONTO", "guideType": "call" }
     ],
     "en": [
-      { "id": "sc", "name": "sch-sch" },
-      { "id": "Hp", "name": "Hoppotta" },
-      { "id": "ku", "name": "kukka" },
-      { "id": "LU", "name": "LUONTO" }
+      { "id": "sc", "name": "sch-sch", "guideType": "manual" },
+      { "id": "Hp", "name": "Hoppotta", "guideType": "manual" },
+      { "id": "ku", "name": "kukka", "guideType": "call" },
+      { "id": "LU", "name": "LUONTO", "guideType": "call" }
     ],
     "zh-TW": [
-      { "id": "sc", "name": "sch-sch" },
-      { "id": "Hp", "name": "Hoppotta" },
-      { "id": "ku", "name": "kukka" },
-      { "id": "LU", "name": "LUONTO" }
+      { "id": "sc", "name": "sch-sch", "guideType": "manual" },
+      { "id": "Hp", "name": "Hoppotta", "guideType": "manual" },
+      { "id": "ku", "name": "kukka", "guideType": "call" },
+      { "id": "LU", "name": "LUONTO", "guideType": "call" }
     ],
     "zh-CN": [
-      { "id": "sc", "name": "sch-sch" },
-      { "id": "Hp", "name": "Hoppotta" },
-      { "id": "ku", "name": "kukka" },
-      { "id": "LU", "name": "LUONTO" }
+      { "id": "sc", "name": "sch-sch", "guideType": "manual" },
+      { "id": "Hp", "name": "Hoppotta", "guideType": "manual" },
+      { "id": "ku", "name": "kukka", "guideType": "call" },
+      { "id": "LU", "name": "LUONTO", "guideType": "call" }
     ]
   },
 
@@ -89,6 +105,15 @@ const APP_CONFIG = {
     ]
   },
 
+  // ▼ OTAポータル5項目認証画面の表示・注意喚起オプション
+  "otaAuthOptions": {
+    "maxNights": 10,
+    "maxAdults": 10,
+    "channelNoticeKey": "cotteNotice",       // 注意書き辞書キー（不要な施設では "" に設定）
+    "showChannelNoticeOnFocus": true,        // 予約経路プルダウン初回フォーカス時にアラート表示
+    "alertTriggerChannelIds": ["cotte"]      // 選択変更時にアラートを再表示するチャネルID配列
+  },
+
   // ▼ 道案内（Google Map）用URLマスタ
   "mapUrls": {
     "sc": "https://www.google.com/maps/dir/?api=1&destination=%E5%8C%97%E8%BB%BD%E4%BA%95%E6%B2%A2%20%E8%B2%B8%E5%88%A5%E8%88%98%20Second%20House%20sch-sch&waypoints=36.446297%2C138.572883%7C36.455880%2C138.568743%7C36.463130%2C138.556438&dir_action=navigate",
@@ -118,6 +143,127 @@ const APP_CONFIG = {
     { "id": "equip", "key": "equip" },
     { "id": "stay", "key": "stay" },
     { "id": "others", "key": "others" }
+  ],
+
+  // ▼ スタッフ専用・備品在庫管理マスタ（main.jsから完全分離・移設）
+  "inventoryFacilities": ["LUONTO", "kukka", "sch-sch", "ホッポッタ"],
+  "inventorySections": [
+    {
+      "id": "sec_linen_towel",
+      "title": "① 寝具・タオル・サウナ類",
+      "items": [
+        { "key": "single_sheet_kake", "name": "シングルシーツ(掛け)", "type": "4level", "facilities": "ALL" },
+        { "key": "single_sheet_shiki", "name": "シングルシーツ(敷)", "type": "4level", "facilities": "ALL" },
+        { "key": "double_sheet_kake", "name": "ダブルシーツ(掛け)", "type": "4level", "facilities": ["LUONTO", "ホッポッタ"] },
+        { "key": "double_sheet_shiki", "name": "ダブルシーツ(敷)", "type": "4level", "facilities": ["LUONTO", "ホッポッタ"] },
+        { "key": "pillow_cover", "name": "枕カバー", "type": "4level", "facilities": "ALL" },
+        { "key": "bath_towel", "name": "バスタオル", "type": "4level", "facilities": "ALL" },
+        { "key": "body_towel", "name": "ボディタオル", "type": "4level", "facilities": "ALL" },
+        { "key": "bath_mat", "name": "足ふきマット", "type": "4level", "facilities": "ALL" },
+        { "key": "sauna_towel", "name": "サウナ用タオル", "type": "4level", "facilities": "ALL" },
+        { "key": "sauna_mat", "name": "サウナ用マット", "type": "4level", "facilities": "ALL" },
+        { "key": "sauna_pants", "name": "サウナ用パンツ", "type": "4level", "facilities": ["LUONTO", "kukka"] }
+      ]
+    },
+    {
+      "id": "sec_wash_bath",
+      "title": "② 洗面所・バス・ランドリー",
+      "items": [
+        { "key": "toothbrush", "name": "歯ブラシ", "type": "4level", "facilities": "ALL" },
+        { "key": "body_sponge", "name": "ボディスポンジ", "type": "4level", "facilities": "ALL" },
+        { "key": "hair_brush", "name": "ヘアブラシ", "type": "4level", "facilities": ["LUONTO", "kukka"] },
+        { "key": "wash_handsoap", "name": "洗面所用ハンドソープ", "type": "2level", "facilities": "ALL" },
+        { "key": "paper_towel_hard", "name": "手拭き用ペーパータオル(硬)", "type": "4level", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "shampoo", "name": "シャンプー", "type": "2level", "facilities": "ALL" },
+        { "key": "conditioner", "name": "コンディショナー", "type": "2level", "facilities": "ALL" },
+        { "key": "body_soap", "name": "ボディソープ", "type": "2level", "facilities": "ALL" },
+        { "key": "cleansing", "name": "クレンジング", "type": "2level", "facilities": "ALL" },
+        { "key": "bath_detergent", "name": "風呂用洗剤", "type": "2level", "facilities": "ALL" },
+        { "key": "laundry_detergent", "name": "洗濯用洗剤", "type": "2level", "facilities": "ALL" }
+      ]
+    },
+    {
+      "id": "sec_kitchen_cafe",
+      "title": "③ キッチン・カフェ・調味料",
+      "items": [
+        { "key": "kitchen_hand_towel", "name": "キッチン用お手拭きタオル", "type": "2level", "facilities": "ALL" },
+        { "key": "kitchen_dish_cloth", "name": "キッチン用食器拭き", "type": "2level", "facilities": "ALL" },
+        { "key": "dish_dry_mat", "name": "食器乾燥エリア用マット", "type": "2level", "facilities": "ALL" },
+        { "key": "dish_detergent", "name": "食器洗い洗剤", "type": "2level", "facilities": "ALL" },
+        { "key": "kitchen_handsoap", "name": "キッチン用ハンドソープ", "type": "2level", "facilities": "ALL" },
+        { "key": "dish_sponge", "name": "食器洗い用スポンジ", "type": "4level", "facilities": "ALL" },
+        { "key": "kitchen_net", "name": "キッチンネット", "type": "4level", "facilities": "ALL" },
+        { "key": "nonwoven_towel", "name": "不織布タオル", "type": "4level", "facilities": "ALL" },
+        { "key": "kitchen_paper", "name": "キッチンペーパー", "type": "4level", "facilities": "ALL" },
+        { "key": "saran_wrap", "name": "サランラップ", "type": "4level", "facilities": "ALL" },
+        { "key": "aluminum_foil", "name": "アルミホイル", "type": "2level", "facilities": "ALL" },
+        { "key": "salt", "name": "塩", "type": "2level", "facilities": "ALL" },
+        { "key": "pepper", "name": "胡椒", "type": "2level", "facilities": "ALL" },
+        { "key": "coffee_beans", "name": "コーヒー豆", "type": "2level", "facilities": "ALL" },
+        { "key": "black_tea", "name": "紅茶", "type": "2level", "facilities": "ALL" }
+      ]
+    },
+    {
+      "id": "sec_toilet_room",
+      "title": "④ トイレ・室内・清掃用品",
+      "items": [
+        { "key": "toilet_paper", "name": "トイレットペーパー", "type": "number", "unit": "残りロール数", "facilities": "ALL" },
+        { "key": "toilet_towel", "name": "トイレ用タオル", "type": "2level", "facilities": ["kukka", "sch-sch"] },
+        { "key": "toilet_floormat", "name": "トイレ用フロアマット", "type": "2level", "facilities": "ALL" },
+        { "key": "toilet_wiper", "name": "トイレ用掃除シート", "type": "number", "unit": "残りパック数", "facilities": "ALL" },
+        { "key": "toilet_detergent", "name": "便器用洗剤(装着型ブラシ)", "type": "2level", "facilities": "ALL" },
+        { "key": "vinyl_gloves", "name": "ビニール手袋", "type": "2level", "facilities": "ALL" },
+        { "key": "tissue", "name": "ティッシュ", "type": "4level", "facilities": "ALL" },
+        { "key": "slippers", "name": "スリッパ", "type": "2level", "facilities": "ALL" }
+      ]
+    },
+    {
+      "id": "sec_bags",
+      "title": "⑤ 袋類（ゴミ袋・ランドリー袋）",
+      "items": [
+        { "key": "garbage_burn_xl", "name": "指定ゴミ袋可燃特大", "type": "4level", "facilities": "ALL" },
+        { "key": "garbage_burn_l", "name": "指定ゴミ袋可燃大", "type": "4level", "facilities": "ALL" },
+        { "key": "garbage_burn_s", "name": "指定ゴミ袋可燃小", "type": "4level", "facilities": "ALL" },
+        { "key": "garbage_nonburn_l", "name": "指定ゴミ袋ビンカン不燃大", "type": "4level", "facilities": "ALL" },
+        { "key": "garbage_nonburn_s", "name": "指定ゴミ袋ビンカン不燃小", "type": "4level", "facilities": "ALL" },
+        { "key": "laundry_bag", "name": "クリーニング用45Lゴミ袋", "type": "4level", "facilities": "ALL" },
+        { "key": "washroom_bag_30l", "name": "洗面所用ゴミ袋30L", "type": "2level", "facilities": "ALL" }
+      ]
+    },
+    {
+      "id": "sec_bbq",
+      "title": "⑥ BBQ用品",
+      "items": [
+        { "key": "bbq_igniter", "name": "BBQ着火剤", "type": "2level", "facilities": "ALL" },
+        { "key": "bbq_lighter", "name": "BBQ用チャッカマン", "type": "2level", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "bbq_charcoal", "name": "BBQ炭", "type": "number", "unit": "箱数", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "bbq_plate_l", "name": "BBQ紙皿大", "type": "2level", "facilities": "ALL" },
+        { "key": "bbq_plate_s", "name": "BBQ紙皿小", "type": "2level", "facilities": "ALL" },
+        { "key": "bbq_chopsticks", "name": "BBQ割りばし", "type": "2level", "facilities": "ALL" },
+        { "key": "bbq_mosquito", "name": "BBQ蚊取り線香", "type": "2level", "facilities": "ALL" }
+      ]
+    }
+  ],
+  "commonEquipments": [
+    {
+      "id": "common_baby_chair",
+      "title": "🪑 ベビーチェア（計5台・所在施設）",
+      "items": [
+        { "key": "chair_swing", "name": "① スイング式" },
+        { "key": "chair_disney1", "name": "② ディズニー(1)" },
+        { "key": "chair_disney2", "name": "③ ディズニー(2)" },
+        { "key": "chair_ikea1", "name": "④ IKEA(1)" },
+        { "key": "chair_ikea2", "name": "⑤ IKEA(2)" }
+      ]
+    },
+    {
+      "id": "common_baby_bed",
+      "title": "🛏️ ベビーベッド（計2台・所在施設）",
+      "items": [
+        { "key": "bed_easy", "name": "① 茶" },
+        { "key": "bed_hard", "name": "② 白" }
+      ]
+    }
   ],
 
   // ▼ 4言語対応の辞書データ

@@ -3,13 +3,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loading = document.getElementById('loading');
   const appContent = document.getElementById('app-content');
 
+  // ページタイトルを設定マスタから反映
+  if (APP_CONFIG.pageTitles && APP_CONFIG.pageTitles.liff) {
+    document.title = APP_CONFIG.pageTitles.liff;
+  }
+
+  // 契約モジュール制御フラグ（未定義時は既存互換で全機能ON）
+  const MODULES = Object.assign({
+    lineGuest: true,
+    nonGuestBooking: true,
+    otaPortal: true,
+    inventory: true,
+    analytics: true
+  }, APP_CONFIG.modules || {});
+
+  // ★ 備品マスタ定義（config.js の APP_CONFIG から取得）
+  const INVENTORY_SECTIONS = Array.isArray(APP_CONFIG.inventorySections) ? APP_CONFIG.inventorySections : [];
+  const COMMON_EQUIPMENT_SECTIONS = Array.isArray(APP_CONFIG.commonEquipments) ? APP_CONFIG.commonEquipments : [];
+  const FACILITY_LIST = Array.isArray(APP_CONFIG.inventoryFacilities) ? APP_CONFIG.inventoryFacilities : [];
+
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
   // ★ スタッフ認証状態と備品データキャッシュ
   let isStaffUser = false;
   let currentMyUserId = '';
   let inventoryCache = {};
-  let currentInvTab = 'LUONTO'; // 'SHORTAGE' | 'LUONTO' | 'kukka' | 'sch-sch' | 'ホッポッタ' | 'COMMON'
+  let currentInvTab = FACILITY_LIST[0] || 'SHORTAGE';
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
 
   // ★ 連打時の通信追い越し防止用（品目別デバウンスタイマー＆通信中カウンタ）
@@ -91,8 +110,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 画面表示（VIEW_...）および完遂アクション（GOAL_...）の記録フック
   function trackStep(stepCode, isGoal = 0, facilityOverride = null) {
     try {
-      if (isStaffUser || traceLevel <= 0) return;
-      if (facilityOverride) currentTrackedFacility = facilityOverride;
+      if (!MODULES.analytics || isStaffUser || traceLevel <= 0) return;
+      if (facilityOverride) {
+        currentTrackedFacility = getCanonicalFacilityName(facilityOverride) || facilityOverride;
+      }
 
       // TRACE_LEVEL === 1（軽量KPIモード）時はゴールイベントのみ送信
       if (traceLevel === 1 && !isGoal) return;
@@ -127,7 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearTimeout(traceFlushTimer);
         traceFlushTimer = null;
       }
-      if (isStaffUser || traceLevel <= 0 || traceQueue.length === 0) return;
+      if (!MODULES.analytics || isStaffUser || traceLevel <= 0 || traceQueue.length === 0) return;
 
       const idToken = (typeof liff !== 'undefined' && liff.isLoggedIn()) ? liff.getIDToken() : null;
       if (!idToken) return;
@@ -184,130 +205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ==========================================
-  // ★ 備品マスタ定義（全50品目・場所優先6カテゴリ ＋ 施設共通2種7個体）
+  // ★ 基本ユーティリティ・施設マスタ参照ヘルパー群
   // ==========================================
-  const INVENTORY_SECTIONS = [
-    {
-      id: 'sec_linen_towel',
-      title: '① 寝具・タオル・サウナ類',
-      items: [
-        { key: 'single_sheet_kake', name: 'シングルシーツ(掛け)', type: '4level', facilities: 'ALL' },
-        { key: 'single_sheet_shiki', name: 'シングルシーツ(敷)', type: '4level', facilities: 'ALL' },
-        { key: 'double_sheet_kake', name: 'ダブルシーツ(掛け)', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
-        { key: 'double_sheet_shiki', name: 'ダブルシーツ(敷)', type: '4level', facilities: ['LUONTO', 'ホッポッタ'] },
-        { key: 'pillow_cover', name: '枕カバー', type: '4level', facilities: 'ALL' },
-        { key: 'bath_towel', name: 'バスタオル', type: '4level', facilities: 'ALL' },
-        { key: 'body_towel', name: 'ボディタオル', type: '4level', facilities: 'ALL' },
-        { key: 'bath_mat', name: '足ふきマット', type: '4level', facilities: 'ALL' },
-        { key: 'sauna_towel', name: 'サウナ用タオル', type: '4level', facilities: 'ALL' },
-        { key: 'sauna_mat', name: 'サウナ用マット', type: '4level', facilities: 'ALL' },
-        { key: 'sauna_pants', name: 'サウナ用パンツ', type: '4level', facilities: ['LUONTO', 'kukka'] }
-      ]
-    },
-    {
-      id: 'sec_wash_bath',
-      title: '② 洗面所・バス・ランドリー',
-      items: [
-        { key: 'toothbrush', name: '歯ブラシ', type: '4level', facilities: 'ALL' },
-        { key: 'body_sponge', name: 'ボディスポンジ', type: '4level', facilities: 'ALL' },
-        { key: 'hair_brush', name: 'ヘアブラシ', type: '4level', facilities: ['LUONTO', 'kukka'] },
-        { key: 'wash_handsoap', name: '洗面所用ハンドソープ', type: '2level', facilities: 'ALL' },
-        { key: 'paper_towel_hard', name: '手拭き用ペーパータオル(硬)', type: '4level', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
-        { key: 'shampoo', name: 'シャンプー', type: '2level', facilities: 'ALL' },
-        { key: 'conditioner', name: 'コンディショナー', type: '2level', facilities: 'ALL' },
-        { key: 'body_soap', name: 'ボディソープ', type: '2level', facilities: 'ALL' },
-        { key: 'cleansing', name: 'クレンジング', type: '2level', facilities: 'ALL' },
-        { key: 'bath_detergent', name: '風呂用洗剤', type: '2level', facilities: 'ALL' },
-        { key: 'laundry_detergent', name: '洗濯用洗剤', type: '2level', facilities: 'ALL' }
-      ]
-    },
-    {
-      id: 'sec_kitchen_cafe',
-      title: '③ キッチン・カフェ・調味料',
-      items: [
-        { key: 'kitchen_hand_towel', name: 'キッチン用お手拭きタオル', type: '2level', facilities: 'ALL' },
-        { key: 'kitchen_dish_cloth', name: 'キッチン用食器拭き', type: '2level', facilities: 'ALL' },
-        { key: 'dish_dry_mat', name: '食器乾燥エリア用マット', type: '2level', facilities: 'ALL' },
-        { key: 'dish_detergent', name: '食器洗い洗剤', type: '2level', facilities: 'ALL' },
-        { key: 'kitchen_handsoap', name: 'キッチン用ハンドソープ', type: '2level', facilities: 'ALL' },
-        { key: 'dish_sponge', name: '食器洗い用スポンジ', type: '4level', facilities: 'ALL' },
-        { key: 'kitchen_net', name: 'キッチンネット', type: '4level', facilities: 'ALL' },
-        { key: 'nonwoven_towel', name: '不織布タオル', type: '4level', facilities: 'ALL' },
-        { key: 'kitchen_paper', name: 'キッチンペーパー', type: '4level', facilities: 'ALL' },
-        { key: 'saran_wrap', name: 'サランラップ', type: '4level', facilities: 'ALL' },
-        { key: 'aluminum_foil', name: 'アルミホイル', type: '2level', facilities: 'ALL' },
-        { key: 'salt', name: '塩', type: '2level', facilities: 'ALL' },
-        { key: 'pepper', name: '胡椒', type: '2level', facilities: 'ALL' },
-        { key: 'coffee_beans', name: 'コーヒー豆', type: '2level', facilities: 'ALL' },
-        { key: 'black_tea', name: '紅茶', type: '2level', facilities: 'ALL' }
-      ]
-    },
-    {
-      id: 'sec_toilet_room',
-      title: '④ トイレ・室内・清掃用品',
-      items: [
-        { key: 'toilet_paper', name: 'トイレットペーパー', type: 'number', unit: '残りロール数', facilities: 'ALL' },
-        { key: 'toilet_towel', name: 'トイレ用タオル', type: '2level', facilities: ['kukka', 'sch-sch'] },
-        { key: 'toilet_floormat', name: 'トイレ用フロアマット', type: '2level', facilities: 'ALL' },
-        { key: 'toilet_wiper', name: 'トイレ用掃除シート', type: 'number', unit: '残りパック数', facilities: 'ALL' },
-        { key: 'toilet_detergent', name: '便器用洗剤(装着型ブラシ)', type: '2level', facilities: 'ALL' },
-        { key: 'vinyl_gloves', name: 'ビニール手袋', type: '2level', facilities: 'ALL' },
-        { key: 'tissue', name: 'ティッシュ', type: '4level', facilities: 'ALL' },
-        { key: 'slippers', name: 'スリッパ', type: '2level', facilities: 'ALL' }
-      ]
-    },
-    {
-      id: 'sec_bags',
-      title: '⑤ 袋類（ゴミ袋・ランドリー袋）',
-      items: [
-        { key: 'garbage_burn_xl', name: '指定ゴミ袋可燃特大', type: '4level', facilities: 'ALL' },
-        { key: 'garbage_burn_l', name: '指定ゴミ袋可燃大', type: '4level', facilities: 'ALL' },
-        { key: 'garbage_burn_s', name: '指定ゴミ袋可燃小', type: '4level', facilities: 'ALL' },
-        { key: 'garbage_nonburn_l', name: '指定ゴミ袋ビンカン不燃大', type: '4level', facilities: 'ALL' },
-        { key: 'garbage_nonburn_s', name: '指定ゴミ袋ビンカン不燃小', type: '4level', facilities: 'ALL' },
-        { key: 'laundry_bag', name: 'クリーニング用45Lゴミ袋', type: '4level', facilities: 'ALL' },
-        { key: 'washroom_bag_30l', name: '洗面所用ゴミ袋30L', type: '2level', facilities: 'ALL' }
-      ]
-    },
-    {
-      id: 'sec_bbq',
-      title: '⑥ BBQ用品',
-      items: [
-        { key: 'bbq_igniter', name: 'BBQ着火剤', type: '2level', facilities: 'ALL' },
-        { key: 'bbq_lighter', name: 'BBQ用チャッカマン', type: '2level', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
-        { key: 'bbq_charcoal', name: 'BBQ炭', type: 'number', unit: '箱数', facilities: ['LUONTO', 'kukka', 'sch-sch'] },
-        { key: 'bbq_plate_l', name: 'BBQ紙皿大', type: '2level', facilities: 'ALL' },
-        { key: 'bbq_plate_s', name: 'BBQ紙皿小', type: '2level', facilities: 'ALL' },
-        { key: 'bbq_chopsticks', name: 'BBQ割りばし', type: '2level', facilities: 'ALL' },
-        { key: 'bbq_mosquito', name: 'BBQ蚊取り線香', type: '2level', facilities: 'ALL' }
-      ]
-    }
-  ];
-
-  const COMMON_EQUIPMENT_SECTIONS = [
-    {
-      id: 'common_baby_chair',
-      title: '🪑 ベビーチェア（計5台・所在施設）',
-      items: [
-        { key: 'chair_swing', name: '① スイング式' },
-        { key: 'chair_disney1', name: '② ディズニー(1)' },
-        { key: 'chair_disney2', name: '③ ディズニー(2)' },
-        { key: 'chair_ikea1', name: '④ IKEA(1)' },
-        { key: 'chair_ikea2', name: '⑤ IKEA(2)' }
-      ]
-    },
-    {
-      id: 'common_baby_bed',
-      title: '🛏️ ベビーベッド（計2台・所在施設）',
-      items: [
-        { key: 'bed_easy', name: '① 茶' },
-        { key: 'bed_hard', name: '② 白' }
-      ]
-    }
-  ];
-
-  const FACILITY_LIST = ['LUONTO', 'kukka', 'sch-sch', 'ホッポッタ'];
-
   function t(key) {
     let val = APP_CONFIG.translations[currentLang]?.[key];
     if (val !== undefined) return val;
@@ -327,24 +226,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#39;');
   }
 
-  // ★ 選択中の言語に応じた敬称付き表示名を生成（Webアプリ版と完全統一）
+  // 選択中の言語に応じた敬称付き表示名を生成（Webアプリ版と完全統一）
   function formatGuestDisplayName(rawName) {
     if (!rawName) return '';
     const formatStr = t('honorificFormat') || '{name}';
     return formatStr.replace('{name}', () => rawName);
   }
 
-  function getLocalizedFacilityName(name) {
-    let facId = null;
+  // 任意の言語の施設名からマスタ定義オブジェクト（guideType等を含む）を取得
+  function getFacilityDefByName(name) {
+    if (!name || !APP_CONFIG.facilities) return null;
     for (const lang in APP_CONFIG.facilities) {
-      const fac = APP_CONFIG.facilities[lang].find(f => f.name === name);
-      if (fac) {
-        facId = fac.id;
-        break;
+      const list = APP_CONFIG.facilities[lang] || [];
+      const found = list.find(f => f.name === name);
+      if (found) {
+        const jaDef = (APP_CONFIG.facilities['ja'] || []).find(f => f.id === found.id);
+        return Object.assign({}, jaDef || {}, found);
       }
     }
-    if (facId) {
-      const localizedFac = (APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja']).find(f => f.id === facId);
+    return null;
+  }
+
+  // 任意の言語の施設名を日本語の基準施設名（canonical名）へ変換
+  function getCanonicalFacilityName(name) {
+    const def = getFacilityDefByName(name);
+    if (def && def.id) {
+      const jaDef = (APP_CONFIG.facilities['ja'] || []).find(f => f.id === def.id);
+      if (jaDef) return jaDef.name;
+    }
+    return name || '';
+  }
+
+  function getLocalizedFacilityName(name) {
+    const def = getFacilityDefByName(name);
+    if (def && def.id) {
+      const localizedFac = (APP_CONFIG.facilities[currentLang] || APP_CONFIG.facilities['ja']).find(f => f.id === def.id);
       if (localizedFac) return localizedFac.name;
     }
     return name;
@@ -354,6 +270,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const jaList = APP_CONFIG.facilities['ja'] || [];
     const found = jaList.find(f => f.id === facId);
     return found ? found.name : facId;
+  }
+
+  // チェックイン完了時の案内種別判定（manual: ようこそ案内のみ / call: スタッフ連絡・WiFi待機案内）
+  function isManualGuideFacility(name) {
+    const def = getFacilityDefByName(name);
+    return Boolean(def && def.guideType === 'manual');
   }
 
   function renderLangSelectorHtml() {
@@ -403,22 +325,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('liff_reauth_state');
     try {
       const st = JSON.parse(raw);
-      if (st.screen === 'checkInOut') {
+      if (st.screen === 'checkInOut' && MODULES.lineGuest) {
         renderCheckInOutAction(st.guestName, st.facilityName);
         return true;
-      } else if (st.screen === 'guestContact') {
+      } else if (st.screen === 'guestContact' && MODULES.lineGuest) {
         renderGuestContactForm(st.guestName, st.facilityName, st.categoryName, st.draftText);
         return true;
-      } else if (st.screen === 'returningBooking') {
+      } else if (st.screen === 'returningBooking' && MODULES.nonGuestBooking) {
         renderReturningBookingForm(st.draftData);
         return true;
-      } else if (st.screen === 'firstTimeBooking') {
+      } else if (st.screen === 'firstTimeBooking' && MODULES.nonGuestBooking) {
         renderBookingMenu();
         return true;
-      } else if (st.screen === 'nonGuestInquiry') {
+      } else if (st.screen === 'nonGuestInquiry' && MODULES.nonGuestBooking) {
         renderNonGuestInquiryForm(st.draftName, st.draftText);
         return true;
-      } else if (st.screen === 'staffInventory' && isStaffUser) {
+      } else if (st.screen === 'staffInventory' && isStaffUser && MODULES.inventory) {
         openStaffInventoryApp();
         return true;
       }
@@ -457,7 +379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     isStaffUser = Boolean(result.isStaff);
     currentMyUserId = result.myUserId || '';
-    traceLevel = (!isStaffUser && typeof result.traceLevel === 'number') ? result.traceLevel : 0;
+    traceLevel = (MODULES.analytics && !isStaffUser && typeof result.traceLevel === 'number') ? result.traceLevel : 0;
 
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -488,30 +410,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層①】TOPメニュー（スタッフのみ備品管理入口を表示）
+  // 【階層①】TOPメニュー（契約モジュール＆スタッフ権限に応じて表示）
   // ==========================================
   function renderTopMenu() {
     trackStep('VIEW_TOP', 0);
 
-    const staffBtnHtml = isStaffUser
+    const guestBtnHtml = MODULES.lineGuest
+      ? `<button class="btn btn-primary" id="btn-guest">${t('guest')}<br><small>${t('guestSub')}</small></button>`
+      : '';
+
+    const nonGuestBtnHtml = MODULES.nonGuestBooking
+      ? `<button class="btn btn-secondary" id="btn-nonguest">${t('nonGuest')}<br><small>${t('nonGuestSub')}</small></button>`
+      : '';
+
+    const staffBtnHtml = (isStaffUser && MODULES.inventory)
       ? `<button class="btn btn-staff-entry" id="btn-staff-inv">🔧 スタッフ用メニュー (備品在庫管理)</button>`
       : '';
 
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2 id="top-menu-heading" style="user-select: none;">${t('selectMenu')}</h2>
-      <button class="btn btn-primary" id="btn-guest">${t('guest')}<br><small>${t('guestSub')}</small></button>
-      <button class="btn btn-secondary" id="btn-nonguest">${t('nonGuest')}<br><small>${t('nonGuestSub')}</small></button>
+      ${guestBtnHtml}
+      ${nonGuestBtnHtml}
       ${staffBtnHtml}
     `;
     bindLangSelectorEvents(renderTopMenu);
 
-    document.getElementById('btn-guest').addEventListener('click', renderGuestTopMenu);
-    document.getElementById('btn-nonguest').addEventListener('click', renderNonGuestMenu);
+    const btnGuestEl = document.getElementById('btn-guest');
+    if (btnGuestEl) btnGuestEl.addEventListener('click', renderGuestTopMenu);
 
-    if (isStaffUser) {
-      document.getElementById('btn-staff-inv').addEventListener('click', openStaffInventoryApp);
-    }
+    const btnNonGuestEl = document.getElementById('btn-nonguest');
+    if (btnNonGuestEl) btnNonGuestEl.addEventListener('click', renderNonGuestMenu);
+
+    const btnStaffInvEl = document.getElementById('btn-staff-inv');
+    if (btnStaffInvEl) btnStaffInvEl.addEventListener('click', openStaffInventoryApp);
 
     // 新規スタッフ追加用：見出しを5回連続タップすると自分のLINE userIdを表示（権限自体は付与されないため安全）
     let tapCount = 0;
@@ -536,6 +468,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ★ スタッフ専用：貸別荘備品管理アプリ機能群
   // ==========================================
   async function openStaffInventoryApp() {
+    if (!MODULES.inventory) return;
+
     loading.innerText = '備品在庫データを読み込んでいます...';
     loading.classList.remove('hidden');
     appContent.classList.add('hidden');
@@ -682,13 +616,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const badgeClass = isSavingNow ? 'save-status-badge saving' : 'save-status-badge';
     const badgeText = isSavingNow ? '⏳ 保存中...' : '✓ 自動保存ON';
 
+    // 施設タブ＋共通備品タブ＋要補充タブをマスタから動的生成
+    const facilityTabBtnsHtml = FACILITY_LIST.map(facName => {
+      const activeCls = (currentInvTab === facName) ? 'active' : '';
+      return `<button class="inv-tab-btn ${activeCls}" data-tab="${escapeHtml(facName)}">${escapeHtml(facName)}</button>`;
+    }).join('');
+
+    const commonTabBtnHtml = COMMON_EQUIPMENT_SECTIONS.length > 0
+      ? `<button class="inv-tab-btn ${currentInvTab === 'COMMON' ? 'active' : ''}" data-tab="COMMON">施設共通</button>`
+      : '';
+
     const tabsHtml = `
       <div class="inv-tabs">
-        <button class="inv-tab-btn ${currentInvTab === 'LUONTO' ? 'active' : ''}" data-tab="LUONTO">LUONTO</button>
-        <button class="inv-tab-btn ${currentInvTab === 'kukka' ? 'active' : ''}" data-tab="kukka">kukka</button>
-        <button class="inv-tab-btn ${currentInvTab === 'sch-sch' ? 'active' : ''}" data-tab="sch-sch">sch-sch</button>
-        <button class="inv-tab-btn ${currentInvTab === 'ホッポッタ' ? 'active' : ''}" data-tab="ホッポッタ">ホッポッタ</button>
-        <button class="inv-tab-btn ${currentInvTab === 'COMMON' ? 'active' : ''}" data-tab="COMMON">施設共通</button>
+        ${facilityTabBtnsHtml}
+        ${commonTabBtnHtml}
         <button class="inv-tab-btn shortage-tab ${currentInvTab === 'SHORTAGE' ? 'active' : ''}" data-tab="SHORTAGE">
           🛒要補充(${totalShortageCount})
         </button>
@@ -804,7 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-inv-back').addEventListener('click', renderTopMenu);
   }
 
-  // 各施設（LUONTO / kukka / sch-sch / ホッポッタ）のサブセクション別HTML生成
+  // 各施設のサブセクション別HTML生成
   function renderFacilityInventoryHtml(facilityName) {
     const facData = inventoryCache[facilityName] || {};
     let html = '';
@@ -902,7 +843,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
   }
 
-  // 施設共通（ベビーチェア5台・ベビーベッド2台）のHTML生成
+  // 施設共通備品のHTML生成
   function renderCommonEquipmentHtml() {
     const commonData = inventoryCache['COMMON'] || {};
     let html = '';
@@ -1101,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // 【階層③〜】宿泊ゲスト向けフロー（多言語敬称・出力メッセージ統一済）
+  // 【階層③〜】宿泊ゲスト向けフロー（多言語敬称・設定マスタ参照統一済）
   // ==========================================
   function renderGuestNameForm() {
     trackStep('VIEW_NAME_INPUT', 0);
@@ -1214,8 +1155,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (res.ok) {
         if (actionLogText === '到着・チェックイン(Checked-In)') {
           trackStep('GOAL_CHECKIN', 1, facilityName);
-          const schSchHoppotta = ["sch-sch", "ホッポッタ", "Hoppotta"];
-          if (schSchHoppotta.includes(facilityName)) {
+          if (isManualGuideFacility(facilityName)) {
             let msgWelcome = t('ci_msg_welcome');
             // 日本語辞書には「{name}様」と既に様が入っているため二重敬称を防止し、他言語では敬称付き名を差し込む
             const welcomeName = (currentLang === 'ja') ? guestName : guestDisplayName;
