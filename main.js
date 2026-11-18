@@ -24,12 +24,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
-  // ★ スタッフ認証状態と備品データキャッシュ
+  // ★ スタッフ・管理者（オーナー）認証状態とキャッシュ
   let isStaffUser = false;
+  let isAdminUser = false;
   let currentMyUserId = '';
   let inventoryCache = {};
   let currentInvTab = FACILITY_LIST[0] || 'SHORTAGE';
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
+
+  // ★ 管理者メニュー用ステートキャッシュ
+  let adminStateCache = null;
+  let currentAdminSubView = 'TOP'; // 'TOP' | 'MAINT' | 'ANALYTICS' | 'CO_BLOCK'
+  let selectedBlockDate = ''; // YYYY-MM-DD
 
   // ★ 連打時の通信追い越し防止用（品目別デバウンスタイマー＆通信中カウンタ）
   const saveDebounceTimers = {};
@@ -110,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 画面表示（VIEW_...）および完遂アクション（GOAL_...）の記録フック
   function trackStep(stepCode, isGoal = 0, facilityOverride = null) {
     try {
-      if (!MODULES.analytics || isStaffUser || traceLevel <= 0) return;
+      if (!MODULES.analytics || isStaffUser || isAdminUser || traceLevel <= 0) return;
       if (facilityOverride) {
         currentTrackedFacility = getCanonicalFacilityName(facilityOverride) || facilityOverride;
       }
@@ -148,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         clearTimeout(traceFlushTimer);
         traceFlushTimer = null;
       }
-      if (!MODULES.analytics || isStaffUser || traceLevel <= 0 || traceQueue.length === 0) return;
+      if (!MODULES.analytics || isStaffUser || isAdminUser || traceLevel <= 0 || traceQueue.length === 0) return;
 
       const idToken = (typeof liff !== 'undefined' && liff.isLoggedIn()) ? liff.getIDToken() : null;
       if (!idToken) return;
@@ -305,6 +311,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     liff.closeWindow();
   }
 
+  // クリップボードコピー＆無料トーク控え送信ヘルパー（Push API枠を一切消費しない）
+  async function copyTextToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        alert('📋 クリップボードにコピーしました。');
+        return;
+      }
+    } catch (e) {}
+    prompt('以下のテキストをコピーしてください：', text);
+  }
+
+  async function sendFreeMemoToMyChat(memoText) {
+    try {
+      if (typeof liff !== 'undefined' && liff.isInClient()) {
+        await liff.sendMessages([{ type: 'text', text: memoText }]);
+        alert('💬 トーク画面に控えメッセージを送信しました（API無料枠は消費しません）。');
+      } else {
+        await copyTextToClipboard(memoText);
+      }
+    } catch (e) {
+      await copyTextToClipboard(memoText);
+    }
+  }
+
   // トークン期限切れによる再認証時に、直前の画面と入力値を一時退避・復元するヘルパー
   function triggerReauthWithState(stateObj) {
     try {
@@ -343,6 +374,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else if (st.screen === 'staffInventory' && isStaffUser && MODULES.inventory) {
         openStaffInventoryApp();
         return true;
+      } else if (st.screen === 'adminConsole' && isAdminUser) {
+        openAdminConsoleApp(st.subView || 'TOP');
+        return true;
       }
     } catch (e) {}
     return false;
@@ -378,8 +412,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('liff_init_retried');
 
     isStaffUser = Boolean(result.isStaff);
+    isAdminUser = Boolean(result.isAdmin);
     currentMyUserId = result.myUserId || '';
-    traceLevel = (MODULES.analytics && !isStaffUser && typeof result.traceLevel === 'number') ? result.traceLevel : 0;
+    traceLevel = (MODULES.analytics && !isStaffUser && !isAdminUser && typeof result.traceLevel === 'number')
+      ? result.traceLevel
+      : 0;
 
     loading.classList.add('hidden');
     appContent.classList.remove('hidden');
@@ -396,21 +433,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // メンテナンス専用画面
+  // メンテナンス専用画面（管理者はここからでも管理メニューを開ける安全設計）
   // ==========================================
   function renderMaintenanceScreen() {
+    const adminEscapeBtnHtml = isAdminUser
+      ? `<button class="btn btn-admin-entry" id="btn-maint-admin" style="margin-top: 15px;">👑 管理者メニューを開く（メンテ解除・設定）</button>`
+      : '';
+
     appContent.innerHTML = `
       <div style="text-align: center; padding: 20px;">
         <h2>🚧 ${t('maintTitle')} 🚧</h2>
         <p style="font-size: 15px; line-height: 1.6; margin-top: 20px;">${t('maintMsg')}</p>
-        <button class="btn btn-danger" id="btn-close" style="margin-top: 30px;">${t('closeApp')}</button>
+        ${adminEscapeBtnHtml}
+        <button class="btn btn-danger" id="btn-close" style="margin-top: 20px;">${t('closeApp')}</button>
       </div>
     `;
     document.getElementById('btn-close').addEventListener('click', closeApp);
+    const adminBtn = document.getElementById('btn-maint-admin');
+    if (adminBtn) {
+      adminBtn.addEventListener('click', () => openAdminConsoleApp('MAINT'));
+    }
   }
 
   // ==========================================
-  // 【階層①】TOPメニュー（契約モジュール＆スタッフ権限に応じて表示）
+  // 【階層①】TOPメニュー（契約モジュール＆スタッフ・管理者権限に応じて表示）
   // ==========================================
   function renderTopMenu() {
     trackStep('VIEW_TOP', 0);
@@ -427,12 +473,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `<button class="btn btn-staff-entry" id="btn-staff-inv">🔧 スタッフ用メニュー (備品在庫管理)</button>`
       : '';
 
+    const adminBtnHtml = isAdminUser
+      ? `<button class="btn btn-admin-entry" id="btn-admin-console">👑 管理者メニュー (システム設定・状況確認)</button>`
+      : '';
+
     appContent.innerHTML = `
       ${renderLangSelectorHtml()}
       <h2 id="top-menu-heading" style="user-select: none;">${t('selectMenu')}</h2>
       ${guestBtnHtml}
       ${nonGuestBtnHtml}
       ${staffBtnHtml}
+      ${adminBtnHtml}
     `;
     bindLangSelectorEvents(renderTopMenu);
 
@@ -445,7 +496,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnStaffInvEl = document.getElementById('btn-staff-inv');
     if (btnStaffInvEl) btnStaffInvEl.addEventListener('click', openStaffInventoryApp);
 
-    // 新規スタッフ追加用：見出しを5回連続タップすると自分のLINE userIdを表示（権限自体は付与されないため安全）
+    const btnAdminEl = document.getElementById('btn-admin-console');
+    if (btnAdminEl) btnAdminEl.addEventListener('click', () => openAdminConsoleApp('TOP'));
+
+    // 新規スタッフ・管理者追加用：見出しを5回連続タップすると自分のLINE userIdを表示
     let tapCount = 0;
     let tapTimer = null;
     const headingEl = document.getElementById('top-menu-heading');
@@ -457,11 +511,552 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (tapCount >= 5) {
           tapCount = 0;
           if (currentMyUserId) {
-            prompt('【スタッフ登録用 LINE User ID】\n以下の文字列をコピーして管理者に共有してください：', currentMyUserId);
+            prompt('【登録用 LINE User ID】\n以下の文字列をコピーしてスクリプトプロパティに登録してください：', currentMyUserId);
           }
         }
       });
     }
+  }
+
+  // ==========================================
+  // ★ 管理者（オーナー）専用メニュー（LINE Push枠 完全ゼロ消費設計）
+  // ==========================================
+  async function callAdminPanelApi(action, params = {}, subViewForReauth = 'TOP') {
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+      triggerReauthWithState({ screen: 'adminConsole', subView: subViewForReauth });
+      return null;
+    }
+
+    loading.innerText = '設定情報を通信しています...';
+    loading.classList.remove('hidden');
+    appContent.classList.add('hidden');
+
+    try {
+      const response = await fetch(APP_CONFIG.GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({
+          type: 'admin_panel',
+          idToken: idToken,
+          action: action
+        }, params))
+      });
+      const json = await response.json();
+      loading.classList.add('hidden');
+      appContent.classList.remove('hidden');
+
+      if (json.status === 'success') {
+        if (json.adminState) {
+          adminStateCache = json.adminState;
+        }
+        return json;
+      } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+        triggerReauthWithState({ screen: 'adminConsole', subView: subViewForReauth });
+        return null;
+      } else {
+        alert('エラー: ' + (json.message || json.code || '権限がありません'));
+        return null;
+      }
+    } catch (e) {
+      loading.classList.add('hidden');
+      appContent.classList.remove('hidden');
+      alert('通信エラーが発生しました: ' + e.message);
+      return null;
+    }
+  }
+
+  async function openAdminConsoleApp(initialSubView = 'TOP') {
+    if (!isAdminUser) return;
+    currentAdminSubView = initialSubView || 'TOP';
+    if (!selectedBlockDate) selectedBlockDate = getTodayDateString();
+
+    const res = await callAdminPanelApi('get_overview', { blockDate: selectedBlockDate }, currentAdminSubView);
+    if (!res) {
+      renderTopMenu();
+      return;
+    }
+    renderAdminConsoleScreen();
+  }
+
+  function renderAdminConsoleScreen() {
+    if (currentAdminSubView === 'MAINT') {
+      renderAdminMaintSubScreen();
+    } else if (currentAdminSubView === 'ANALYTICS') {
+      renderAdminAnalyticsSubScreen();
+    } else if (currentAdminSubView === 'CO_BLOCK') {
+      renderAdminCoBlockSubScreen();
+    } else {
+      renderAdminTopSubScreen();
+    }
+  }
+
+  // 管理者メニュー：トップ階層
+  function renderAdminTopSubScreen() {
+    const st = adminStateCache || {};
+    const isMaintOn = Boolean(st.maintenanceMode);
+    const maintBadge = isMaintOn
+      ? `<span class="admin-status-pill pill-on">🚧 メンテナンス中</span>`
+      : `<span class="admin-status-pill pill-off">🟢 通常稼働中</span>`;
+
+    const lv = (st.traceLevel !== undefined) ? st.traceLevel : 2;
+    const lvLabels = {
+      0: 'レベル0 (停止)',
+      1: 'レベル1 (簡易)',
+      2: 'レベル2 (標準)',
+      3: 'レベル3 (標準+日次メール)'
+    };
+
+    const blockedCount = st.coBlockMap
+      ? Object.values(st.coBlockMap).filter(Boolean).length
+      : 0;
+    const blockBadge = blockedCount > 0
+      ? `<span class="admin-status-pill pill-on">🔴 ${blockedCount}施設 停止中</span>`
+      : `<span class="admin-status-pill pill-off">🟢 全施設 通常送信</span>`;
+
+    const analyticsCardHtml = MODULES.analytics ? `
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>📊 アプリ利用状況・記録設定</span>
+          <span class="admin-status-pill pill-info">${escapeHtml(lvLabels[lv] || ('レベル' + lv))}</span>
+        </div>
+        <div class="admin-desc">
+          今月の予約数に対するアプリ利用率の確認や、記録する細かさ（確認粒度）の変更を行います。
+        </div>
+        <button class="btn btn-primary" id="btn-adm-go-analytics" style="margin-bottom:0; padding:12px;">利用状況・確認粒度の設定へ</button>
+      </div>
+    ` : '';
+
+    appContent.innerHTML = `
+      <div class="staff-header-bar">
+        <h3 class="staff-title">👑 管理者メニュー</h3>
+        <span class="save-status-badge">LINE枠消費ゼロ</span>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>🔧 メンテナンス・動作テスト</span>
+          ${maintBadge}
+        </div>
+        <div class="admin-desc">
+          メンテナンス画面への切り替え（管理者用バイパスURLの自動発行）や、OTAポータル認証テスト用のダミー予約発行を行います。
+        </div>
+        <button class="btn btn-primary" id="btn-adm-go-maint" style="margin-bottom:0; padding:12px;">メンテナンス・テスト設定へ</button>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>🔕 チェックアウト自動連絡制御</span>
+          ${blockBadge}
+        </div>
+        <div class="admin-desc">
+          チェックアウト5分後に自動送信されるお礼メッセージを、日付・施設ごとにワンタップで停止・解除できます（対象日: ${escapeHtml(st.blockDate || selectedBlockDate)}）。
+        </div>
+        <button class="btn btn-primary" id="btn-adm-go-coblock" style="margin-bottom:0; padding:12px;">施設別の停止・解除設定へ</button>
+      </div>
+
+      ${analyticsCardHtml}
+
+      <div style="margin-top: 16px; display: flex; gap: 8px;">
+        <button class="btn btn-secondary" id="btn-adm-refresh" style="margin-bottom:0; padding:12px;">🔄 最新状態に更新</button>
+        <button class="btn btn-secondary" id="btn-adm-back-top" style="margin-bottom:0; padding:12px;">TOPメニューへ戻る</button>
+      </div>
+    `;
+
+    document.getElementById('btn-adm-go-maint').addEventListener('click', () => {
+      currentAdminSubView = 'MAINT';
+      renderAdminConsoleScreen();
+    });
+    document.getElementById('btn-adm-go-coblock').addEventListener('click', () => {
+      currentAdminSubView = 'CO_BLOCK';
+      renderAdminConsoleScreen();
+    });
+    const btnAnalytics = document.getElementById('btn-adm-go-analytics');
+    if (btnAnalytics) {
+      btnAnalytics.addEventListener('click', () => {
+        currentAdminSubView = 'ANALYTICS';
+        renderAdminConsoleScreen();
+      });
+    }
+    document.getElementById('btn-adm-refresh').addEventListener('click', () => openAdminConsoleApp('TOP'));
+    document.getElementById('btn-adm-back-top').addEventListener('click', renderTopMenu);
+  }
+
+  // 管理者メニュー①：メンテナンスモード設定 ＆ OTA認証テスト発行
+  function renderAdminMaintSubScreen() {
+    const st = adminStateCache || {};
+    const isMaintOn = Boolean(st.maintenanceMode);
+    const isBypassOn = Boolean(st.adminBypassMode);
+
+    const statusBadge = isMaintOn
+      ? `<span class="admin-status-pill pill-on">🚧 現在：メンテナンス中</span>`
+      : `<span class="admin-status-pill pill-off">🟢 現在：通常稼働中</span>`;
+
+    let bypassBoxHtml = '';
+    if (isBypassOn && st.bypassUrlInfo) {
+      bypassBoxHtml = `
+        <div class="admin-info-box">
+          <strong>🔓 管理者除外（バイパス）モード有効中</strong><br>
+          ・LINE版：管理者はそのまま全画面を操作できます。<br>
+          ・Web(OTA)版バイパスURL：<br>
+          <span style="color:#1565c0; font-weight:bold;">${escapeHtml(st.bypassUrlInfo)}</span>
+          <div class="admin-sub-actions">
+            <button type="button" class="btn-mini" id="btn-copy-bypass">📋 URLをコピー</button>
+            <button type="button" class="btn-mini" id="btn-memo-bypass">💬 トークにメモ送信</button>
+          </div>
+        </div>
+      `;
+    }
+
+    let otaTestCardHtml = '';
+    if (MODULES.otaPortal) {
+      const tb = st.otaTestBooking;
+      let tbBoxHtml = '';
+      if (tb && tb.ci) {
+        tbBoxHtml = `
+          <div class="admin-info-box">
+            <strong>🧪 現在有効なOTAテスト予約条件（全施設共通）</strong><br>
+            ・チェックイン日：<strong>${escapeHtml(tb.ci)}</strong><br>
+            ・施設：<strong>全施設どれでも選択可</strong><br>
+            ・宿泊日数：<strong>${escapeHtml(tb.n)} 泊</strong><br>
+            ・大人人数：<strong>${escapeHtml(tb.a)} 名</strong><br>
+            ・予約経路：<strong>${escapeHtml(tb.ch)}</strong>
+            <div class="admin-sub-actions">
+              <button type="button" class="btn-mini" id="btn-copy-otatest">📋 条件をコピー</button>
+              <button type="button" class="btn-mini" id="btn-memo-otatest">💬 トークにメモ送信</button>
+            </div>
+          </div>
+          <button class="btn btn-danger" id="btn-stop-otatest" style="padding:11px; font-size:14px; margin-top:8px; margin-bottom:0;">🧹 OTAテスト予約を終了（無効化）する</button>
+        `;
+      } else {
+        tbBoxHtml = `<p style="font-size:12px; color:#666; margin:6px 0 10px 0;">現在、有効なテスト条件は発行されていません。</p>`;
+      }
+
+      otaTestCardHtml = `
+        <div class="admin-card">
+          <div class="admin-card-title">
+            <span>🧪 OTAポータル 5項目認証テスト</span>
+          </div>
+          <div class="admin-desc">
+            実際の予約データと衝突しない「30分間限定のテスト用5項目条件」を発行します。Webポータル画面のログイン確認に使えます。
+          </div>
+          <button class="btn btn-primary" id="btn-start-otatest" style="padding:12px; font-size:14px;">🧪 テスト用予約条件を新しく発行する (30分間有効)</button>
+          ${tbBoxHtml}
+        </div>
+      `;
+    }
+
+    appContent.innerHTML = `
+      <div class="staff-header-bar">
+        <h3 class="staff-title">🔧 メンテナンス・動作テスト</h3>
+        <span class="save-status-badge">LINE枠消費ゼロ</span>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>🚧 メンテナンスモード設定</span>
+          ${statusBadge}
+        </div>
+        <div class="admin-desc">
+          開始すると一般ゲストの画面を「メンテナンス中」に切り替え、同時に<strong>オーナー確認用のバイパスURLを自動発行</strong>します。終了すると通常稼働に戻り、バイパスURLも自動失効します。
+        </div>
+        ${bypassBoxHtml}
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button class="btn ${isMaintOn ? 'btn-secondary' : 'btn-danger'}" id="btn-maint-start" style="flex:1; margin-bottom:0; padding:12px; font-size:14px;">
+            ${isMaintOn ? '🔄 バイパスURL再発行' : '🚧 メンテナンス開始'}
+          </button>
+          <button class="btn ${isMaintOn ? 'btn-primary' : 'btn-secondary'}" id="btn-maint-end" style="flex:1; margin-bottom:0; padding:12px; font-size:14px;" ${!isMaintOn && !isBypassOn ? 'disabled' : ''}>
+            ✅ メンテナンス終了
+          </button>
+        </div>
+      </div>
+
+      ${otaTestCardHtml}
+
+      <button class="btn btn-secondary" id="btn-back-adm-top" style="margin-top:10px;">管理者メニューへ戻る</button>
+    `;
+
+    // メンテナンス開始（管理者バイパスもセットで自動ON）
+    document.getElementById('btn-maint-start').addEventListener('click', async () => {
+      if (!confirm('メンテナンスモードを開始し、管理者確認用のバイパスURLを発行しますか？')) return;
+      const res = await callAdminPanelApi('set_maintenance', { enable: true, withBypass: true, blockDate: selectedBlockDate }, 'MAINT');
+      if (res) {
+        const infoUrl = (res.adminState && res.adminState.bypassUrlInfo) ? res.adminState.bypassUrlInfo : '';
+        alert('🔧 メンテナンスモードを開始しました。\n\n【OTA版バイパスURL】\n' + infoUrl);
+        renderAdminMaintSubScreen();
+      }
+    });
+
+    // メンテナンス終了（バイパスも同時失効）
+    document.getElementById('btn-maint-end').addEventListener('click', async () => {
+      if (!confirm('メンテナンスモードを終了し、通常稼働に戻しますか？（バイパスURLも失効します）')) return;
+      const res = await callAdminPanelApi('set_maintenance', { enable: false, withBypass: false, blockDate: selectedBlockDate }, 'MAINT');
+      if (res) {
+        alert('✅ メンテナンスモードを終了しました。');
+        renderAdminMaintSubScreen();
+      }
+    });
+
+    const btnCopyBypass = document.getElementById('btn-copy-bypass');
+    if (btnCopyBypass && st.bypassUrlInfo) {
+      btnCopyBypass.addEventListener('click', () => copyTextToClipboard(st.bypassUrlInfo));
+    }
+    const btnMemoBypass = document.getElementById('btn-memo-bypass');
+    if (btnMemoBypass && st.bypassUrlInfo) {
+      btnMemoBypass.addEventListener('click', () => {
+        sendFreeMemoToMyChat(`🔓【管理者バイパスURL控え】\n${st.bypassUrlInfo}`);
+      });
+    }
+
+    // OTAテスト条件の発行・終了
+    const btnStartOtaTest = document.getElementById('btn-start-otatest');
+    if (btnStartOtaTest) {
+      btnStartOtaTest.addEventListener('click', async () => {
+        const res = await callAdminPanelApi('start_ota_test', { blockDate: selectedBlockDate }, 'MAINT');
+        if (res && res.adminState && res.adminState.otaTestBooking) {
+          const tb = res.adminState.otaTestBooking;
+          const summary =
+            `🧪【OTAテスト予約（30分間有効）】\n` +
+            `・チェックイン日：${tb.ci}\n` +
+            `・施設：全施設どれでも選択可\n` +
+            `・宿泊日数：${tb.n} 泊\n` +
+            `・大人人数：${tb.a} 名\n` +
+            `・予約経路：${tb.ch}`;
+          alert(summary);
+          renderAdminMaintSubScreen();
+        }
+      });
+    }
+
+    const btnStopOtaTest = document.getElementById('btn-stop-otatest');
+    if (btnStopOtaTest) {
+      btnStopOtaTest.addEventListener('click', async () => {
+        const res = await callAdminPanelApi('stop_ota_test', { blockDate: selectedBlockDate }, 'MAINT');
+        if (res) {
+          alert('🧹 OTAテスト予約を無効化しました。');
+          renderAdminMaintSubScreen();
+        }
+      });
+    }
+
+    const btnCopyOtaTest = document.getElementById('btn-copy-otatest');
+    if (btnCopyOtaTest && st.otaTestBooking) {
+      const tb = st.otaTestBooking;
+      const text = `チェックイン日: ${tb.ci} / 宿泊日数: ${tb.n}泊 / 大人人数: ${tb.a}名 / 予約経路: ${tb.ch}`;
+      btnCopyOtaTest.addEventListener('click', () => copyTextToClipboard(text));
+    }
+    const btnMemoOtaTest = document.getElementById('btn-memo-otatest');
+    if (btnMemoOtaTest && st.otaTestBooking) {
+      const tb = st.otaTestBooking;
+      const text = `🧪【OTAテスト予約控え（30分間有効）】\n・チェックイン日：${tb.ci}\n・施設：全施設選択可\n・宿泊日数：${tb.n} 泊\n・大人人数：${tb.a} 名\n・予約経路：${tb.ch}`;
+      btnMemoOtaTest.addEventListener('click', () => sendFreeMemoToMyChat(text));
+    }
+
+    document.getElementById('btn-back-adm-top').addEventListener('click', () => {
+      currentAdminSubView = 'TOP';
+      renderAdminConsoleScreen();
+    });
+  }
+
+  // 管理者メニュー②：チェックアウト自動お礼メッセージの日付・施設別停止制御
+  function renderAdminCoBlockSubScreen() {
+    const st = adminStateCache || {};
+    const curDate = st.blockDate || selectedBlockDate || getTodayDateString();
+    selectedBlockDate = curDate;
+    const blockMap = st.coBlockMap || {};
+
+    const facilities = (APP_CONFIG.facilities['ja'] || []).map(f => f.name);
+    let rowsHtml = '';
+    facilities.forEach(facName => {
+      const isBlocked = Boolean(blockMap[facName]);
+      const btnCls = isBlocked ? 'co-toggle-btn co-toggle-blocked' : 'co-toggle-btn co-toggle-normal';
+      const btnText = isBlocked ? '🔴 停止中 (解除する)' : '🟢 通常送信 (停止する)';
+      rowsHtml += `
+        <div class="co-block-row">
+          <span class="co-fac-name">🏠 ${escapeHtml(facName)}</span>
+          <button type="button" class="${btnCls}" data-fac="${escapeHtml(facName)}" data-blocked="${isBlocked ? '1' : '0'}">
+            ${btnText}
+          </button>
+        </div>
+      `;
+    });
+
+    appContent.innerHTML = `
+      <div class="staff-header-bar">
+        <h3 class="staff-title">🔕 チェックアウト自動連絡制御</h3>
+        <span class="save-status-badge">ワンタップ切替</span>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>📅 対象日の選択</span>
+          <button type="button" class="inv-today-btn" id="btn-coblock-today">今日に戻す</button>
+        </div>
+        <div class="admin-desc">
+          ゲストがチェックアウトボタンを押した5分後に自動送信されるお礼LINEを、特定の日・施設だけ一時的にストップできます。
+        </div>
+        <input type="date" id="adm-coblock-date" class="input-field" value="${escapeHtml(curDate)}" style="margin-bottom:8px;">
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>🏠 施設別の送信ステータス (${escapeHtml(curDate)})</span>
+        </div>
+        <div class="admin-desc">ボタンをタップすると「通常送信」と「停止中」が即座に切り替わります。</div>
+        ${rowsHtml}
+      </div>
+
+      <button class="btn btn-secondary" id="btn-back-adm-top">管理者メニューへ戻る</button>
+    `;
+
+    document.getElementById('adm-coblock-date').addEventListener('change', async (e) => {
+      const newDate = e.target.value;
+      if (!newDate) return;
+      selectedBlockDate = newDate;
+      const res = await callAdminPanelApi('get_overview', { blockDate: selectedBlockDate }, 'CO_BLOCK');
+      if (res) renderAdminCoBlockSubScreen();
+    });
+
+    document.getElementById('btn-coblock-today').addEventListener('click', async () => {
+      selectedBlockDate = getTodayDateString();
+      const res = await callAdminPanelApi('get_overview', { blockDate: selectedBlockDate }, 'CO_BLOCK');
+      if (res) renderAdminCoBlockSubScreen();
+    });
+
+    document.querySelectorAll('.co-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const currentlyBlocked = e.currentTarget.getAttribute('data-blocked') === '1';
+        const nextBlockState = !currentlyBlocked;
+        const res = await callAdminPanelApi('set_co_block', {
+          blockDate: selectedBlockDate,
+          facility: fac,
+          block: nextBlockState
+        }, 'CO_BLOCK');
+        if (res) renderAdminCoBlockSubScreen();
+      });
+    });
+
+    document.getElementById('btn-back-adm-top').addEventListener('click', () => {
+      currentAdminSubView = 'TOP';
+      renderAdminConsoleScreen();
+    });
+  }
+
+  // 管理者メニュー③：アプリ利用状況サマリー ＆ 確認粒度（記録レベル）変更
+  function renderAdminAnalyticsSubScreen() {
+    const st = adminStateCache || {};
+    const curLevel = (st.traceLevel !== undefined) ? Number(st.traceLevel) : 2;
+    const summaryText = st.analyticsSummaryText || '（「最新データで再集計する」を押すと当月の利用サマリーが表示されます）';
+    const sheetUrl = st.analyticsSheetUrl || '';
+
+    const levelDefs = [
+      {
+        lv: 0,
+        title: 'レベル0：記録停止（OFF）',
+        desc: 'アプリの利用状況やアクセスログを一切記録しません。'
+      },
+      {
+        lv: 1,
+        title: 'レベル1：簡易記録（完了アクションのみ）',
+        desc: 'チェックイン・アウト完了、道案内起動、OTA認証成否など「最終ゴール」のみを軽量に記録します。'
+      },
+      {
+        lv: 2,
+        title: 'レベル2：標準記録（推奨・全画面分析）',
+        desc: 'どの画面で迷って離脱したか、滞在中の日跨ぎリピート、海外ゲスト利用（渡航前／来日後）まで全て記録します。'
+      },
+      {
+        lv: 3,
+        title: 'レベル3：標準記録 ＋ 毎日メールレポート',
+        desc: 'レベル2の全記録に加え、1日1回（20時間以上経過時）指定メールアドレスへ利用サマリーを自動送信します。'
+      }
+    ];
+
+    const levelBtnsHtml = levelDefs.map(d => {
+      const isSel = (curLevel === d.lv);
+      const badge = isSel
+        ? `<span class="admin-status-pill pill-off">✓ 選択中</span>`
+        : `<span style="font-size:11px; color:#888;">タップで切替</span>`;
+      return `
+        <button type="button" class="level-option-btn ${isSel ? 'active' : ''}" data-lv="${d.lv}">
+          <div class="level-opt-header">
+            <span>${escapeHtml(d.title)}</span>
+            ${badge}
+          </div>
+          <div class="level-opt-desc">${escapeHtml(d.desc)}</div>
+        </button>
+      `;
+    }).join('');
+
+    const sheetLinkBtnHtml = sheetUrl
+      ? `<button type="button" class="btn-mini" id="btn-open-analytics-sheet">📊 分析スプレッドシートを開く</button>`
+      : '';
+
+    appContent.innerHTML = `
+      <div class="staff-header-bar">
+        <h3 class="staff-title">📊 アプリ利用状況・確認粒度</h3>
+        <span class="save-status-badge">LINE枠消費ゼロ</span>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>📈 当月の利用状況サマリー</span>
+        </div>
+        <div class="admin-info-box" style="white-space: pre-wrap; font-size:12px;">${escapeHtml(summaryText)}</div>
+        <div class="admin-sub-actions">
+          <button type="button" class="btn-mini" id="btn-refresh-kpi">🔄 最新データで再集計する</button>
+          ${sheetLinkBtnHtml}
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-title">
+          <span>⚙️ 確認粒度（記録レベル）の変更</span>
+        </div>
+        <div class="admin-desc">
+          ご希望の記録方法のボタンをタップすると即座に切り替わります（ゲストやスタッフの操作感はどのレベルでも変わりません）。
+        </div>
+        ${levelBtnsHtml}
+      </div>
+
+      <button class="btn btn-secondary" id="btn-back-adm-top">管理者メニューへ戻る</button>
+    `;
+
+    document.getElementById('btn-refresh-kpi').addEventListener('click', async () => {
+      const res = await callAdminPanelApi('refresh_analytics', { blockDate: selectedBlockDate }, 'ANALYTICS');
+      if (res) {
+        alert('📊 月次KPIシートを最新状態に再集計しました。');
+        renderAdminAnalyticsSubScreen();
+      }
+    });
+
+    const btnOpenSheet = document.getElementById('btn-open-analytics-sheet');
+    if (btnOpenSheet && sheetUrl) {
+      btnOpenSheet.addEventListener('click', () => {
+        if (liff.isInClient()) {
+          liff.openWindow({ url: sheetUrl, external: true });
+        } else {
+          window.open(sheetUrl, '_blank');
+        }
+      });
+    }
+
+    document.querySelectorAll('.level-option-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const targetLv = parseInt(e.currentTarget.getAttribute('data-lv'), 10);
+        if (targetLv === curLevel) return;
+        const res = await callAdminPanelApi('set_trace_level', { level: targetLv, blockDate: selectedBlockDate }, 'ANALYTICS');
+        if (res) {
+          alert(`⚙️ 確認粒度（TRACE_LEVEL）を「レベル${targetLv}」に変更しました。`);
+          renderAdminAnalyticsSubScreen();
+        }
+      });
+    });
+
+    document.getElementById('btn-back-adm-top').addEventListener('click', () => {
+      currentAdminSubView = 'TOP';
+      renderAdminConsoleScreen();
+    });
   }
 
   // ==========================================
