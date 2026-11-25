@@ -43,19 +43,24 @@
 
     /* 第2階層：サブセクション（アコーディオン） */
     .inv-section { border: 1px solid #e1e4e8; border-radius: 8px; margin-bottom: 10px; overflow: hidden; background: #fff; }
-    .inv-sec-header { width: 100%; padding: 12px 14px; background: #f8f9fa; border: none; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: bold; color: #2c3e50; cursor: pointer; text-align: left; box-sizing: border-box; }
+    .inv-sec-header { width: 100%; padding: 12px 14px; background: #f8f9fa; border: none; display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 14px; font-weight: bold; color: #2c3e50; cursor: pointer; text-align: left; box-sizing: border-box; }
     .inv-sec-header:active { background: #eef1f5; }
-    .inv-sec-badges { display: flex; align-items: center; gap: 6px; }
+    .inv-sec-badges { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+    .badge-zero { background: #7f1d1d; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: bold; }
     .badge-warn { background: #ff4d4f; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: bold; }
+    .badge-memo { background: #e3f2fd; color: #1565c0; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: bold; }
     .badge-ok { background: #e8f5e9; color: #2e7d32; font-size: 11px; padding: 2px 7px; border-radius: 10px; }
     .inv-sec-body { padding: 8px 12px; border-top: 1px solid #e1e4e8; }
 
     /* 各備品アイテム行 */
     .inv-item { padding: 10px 0; border-bottom: 1px dashed #eaecef; }
     .inv-item:last-child { border-bottom: none; }
-    .inv-item-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
-    .inv-item-name { font-size: 14px; font-weight: bold; color: #222; }
+    .inv-item-zero { background: #fff5f5; border-left: 3px solid #7f1d1d; padding: 10px 8px; margin: 4px -4px; border-radius: 4px; border-bottom: 1px dashed #f5c2c7; }
+    .inv-item-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 7px; }
+    .inv-item-name { font-size: 14px; font-weight: bold; color: #222; line-height: 1.35; }
     .inv-item-unit { font-size: 11px; color: #666; margin-left: 4px; font-weight: normal; }
+    .inv-cat-tag { display: inline-block; margin-right: 4px; font-size: 13px; }
+    .inv-zero-pill { flex-shrink: 0; background: #7f1d1d; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 7px; border-radius: 10px; }
 
     /* 横並びタイル型ラジオボタン */
     .inv-seg-group { display: flex; gap: 5px; margin-bottom: 7px; }
@@ -64,13 +69,18 @@
     .inv-seg-btn.sel-mid { background: #1890ff; color: #fff; border-color: #1890ff; }
     .inv-seg-btn.sel-low { background: #faad14; color: #fff; border-color: #faad14; }
     .inv-seg-btn.sel-crit { background: #ff4d4f; color: #fff; border-color: #ff4d4f; }
+    .inv-seg-btn.sel-zero { background: #7f1d1d; color: #fff; border-color: #7f1d1d; box-shadow: 0 0 0 1px #7f1d1d inset; }
     .inv-seg-btn.sel-loc { background: #2c3e50; color: #fff; border-color: #2c3e50; font-size: 11px; padding: 8px 2px; }
+
+    /* 旧ステータス移行案内（4levelに残存する旧「少」用） */
+    .inv-legacy-note { font-size: 11px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 4px 8px; margin-bottom: 7px; line-height: 1.4; }
 
     /* 実数ステッパー（－ / ＋） */
     .inv-num-group { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
     .inv-step-btn { width: 42px; height: 36px; font-size: 18px; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; background: #f0f2f5; color: #333; cursor: pointer; }
     .inv-step-btn:active { background: #dcdfe6; }
     .inv-num-input { width: 70px; height: 36px; text-align: center; font-size: 16px; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    .inv-num-input.is-zero { background: #ffebee; color: #7f1d1d; border: 2px solid #7f1d1d; }
 
     /* 最終確認日＆「本日」ボタン */
     .inv-date-row { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 11px; color: #666; }
@@ -78,8 +88,34 @@
     .inv-today-btn { padding: 4px 9px; font-size: 11px; font-weight: bold; border: 1px solid #2c3e50; border-radius: 4px; background: #fff; color: #2c3e50; cursor: pointer; }
     .inv-today-btn:active { background: #2c3e50; color: #fff; }
 
-    /* 要補充まとめリスト用 */
+    /* 全スタッフ共有メモ欄 */
+    .inv-memo-area { margin-top: 8px; }
+    .inv-memo-toggle-btn { padding: 5px 10px; font-size: 11px; font-weight: bold; border: 1px dashed #90a4ae; border-radius: 5px; background: #fafcff; color: #37474f; cursor: pointer; }
+    .inv-memo-toggle-btn:active { background: #e3f2fd; }
+    .inv-memo-toggle-btn.has-memo { flex-shrink: 0; border-style: solid; border-color: #1976d2; background: #fff; color: #1976d2; padding: 4px 9px; }
+    .inv-memo-preview { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; background: #f0f7ff; border: 1px solid #bbdefb; border-left: 3px solid #1976d2; border-radius: 5px; padding: 7px 8px; }
+    .inv-memo-preview-body { font-size: 12px; color: #1e293b; line-height: 1.45; word-break: break-word; white-space: pre-wrap; }
+    .inv-memo-preview-text { font-weight: 500; }
+    .inv-memo-preview-meta { font-size: 10px; color: #64748b; margin-left: 3px; }
+    .inv-memo-editor { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; }
+    .inv-memo-textarea { width: 100%; min-height: 64px; padding: 8px; font-size: 16px; line-height: 1.4; border: 1px solid #94a3b8; border-radius: 5px; box-sizing: border-box; resize: vertical; font-family: inherit; background: #fff; color: #222; }
+    .inv-memo-footer { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .inv-memo-count { font-size: 11px; color: #64748b; }
+    .inv-memo-actions { display: flex; gap: 5px; }
+    .inv-memo-save-btn { padding: 6px 12px; font-size: 12px; font-weight: bold; border: none; border-radius: 5px; background: #1976d2; color: #fff; cursor: pointer; }
+    .inv-memo-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .inv-memo-clear-btn { padding: 6px 10px; font-size: 12px; font-weight: bold; border: 1px solid #ef9a9a; border-radius: 5px; background: #ffebee; color: #c62828; cursor: pointer; }
+    .inv-memo-cancel-btn { padding: 6px 10px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff; color: #475569; cursor: pointer; }
+
+    /* 要補充まとめリスト ＆ 配下2ボタン（クリーニング・洗濯物／消耗品） */
+    .shortage-subtabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .inv-shortage-cat-btn { flex: 1; padding: 10px 6px; font-size: 12px; font-weight: bold; border: 1px solid #d0d7de; border-radius: 7px; background: #f8f9fa; color: #333; cursor: pointer; text-align: center; transition: 0.15s; line-height: 1.3; }
+    .inv-shortage-cat-btn.active { background: #b71c1c; color: #fff; border-color: #b71c1c; box-shadow: 0 2px 4px rgba(183,28,28,0.2); }
     .shortage-card { border-left: 4px solid #ff4d4f; background: #fff9f9; padding: 8px 10px; margin-bottom: 8px; border-radius: 4px; }
+    .shortage-card-zero { border-left: 5px solid #7f1d1d; background: #ffefef; box-shadow: 0 1px 4px rgba(127,29,29,0.12); }
+    .shortage-status-bar { font-size: 11px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-bottom: 6px; display: inline-block; }
+    .shortage-status-zero { background: #7f1d1d; color: #fff; }
+    .shortage-status-low { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
     .shortage-fac-title { font-size: 13px; font-weight: bold; color: #2c3e50; margin: 12px 0 6px 0; border-bottom: 1px solid #eee; padding-bottom: 3px; }
 
     /* ==========================================

@@ -145,102 +145,158 @@ const APP_CONFIG = {
     { "id": "others", "key": "others" }
   ],
 
-  // ▼ スタッフ専用・備品在庫管理マスタ（main.jsから完全分離・移設）
+  // ▼ スタッフ専用・備品在庫管理マスタ（パッケージング準拠・設定駆動定義）
   "inventoryFacilities": ["LUONTO", "kukka", "sch-sch", "ホッポッタ"],
+
+  // 「要補充」配下の区分ボタン＆ステータス文言定義（テナントごとに自由差し替え可能）
+  "inventoryShortageCategories": [
+    {
+      "id": "cleaning",
+      "label": "クリーニング・洗濯物",
+      "icon": "🧺",
+      "shortTag": "🧺",
+      "zeroStatusLabel": "🚨 施設現物なし（回収・配布要）",
+      "lowStatusLabel": "⚠️ 施設現物少（回収・配布確認）",
+      "emptyMessage": "✅ 現在、回収・配布が必要なクリーニング・洗濯物はありません。"
+    },
+    {
+      "id": "consumable",
+      "label": "消耗品",
+      "icon": "🛒",
+      "shortTag": "🛒",
+      "zeroStatusLabel": "🚨 在庫無（至急購入・補充）",
+      "lowStatusLabel": "⚠️ 在庫少（購入・配布検討）",
+      "emptyMessage": "✅ 現在、購入・補充が必要な消耗品はありません。"
+    }
+  ],
+
+  // 入力タイプ別の選択肢ボタン・要補充判定ルール（旧「少」データ後方互換含む）
+  "inventoryLevels": {
+    "4level": [
+      { "value": "多", "cls": "sel-good", "shortage": false, "isZero": false },
+      { "value": "中", "cls": "sel-mid", "shortage": false, "isZero": false },
+      { "value": "極小", "cls": "sel-crit", "shortage": true, "isZero": false },
+      { "value": "無", "cls": "sel-zero", "shortage": true, "isZero": true }
+    ],
+    "2level": [
+      { "value": "多", "cls": "sel-good", "shortage": false, "isZero": false },
+      { "value": "少", "cls": "sel-low", "shortage": true, "isZero": false },
+      { "value": "無", "cls": "sel-zero", "shortage": true, "isZero": true }
+    ],
+    "legacyShortageValues": ["少"],
+    "numberThreshold": {
+      "zeroValue": 0,
+      "shortageMax": 1
+    }
+  },
+
+  // 全スタッフ共有メモ欄の表示・入力設定（施設別＋施設共通両対応）
+  "inventoryMemoConfig": {
+    "enabled": true,
+    "commonEnabled": true,
+    "maxLength": 100,
+    "placeholder": "例：購入済み・配布待ち / kukkaから要運搬 など"
+  },
+
   "inventorySections": [
     {
       "id": "sec_linen_towel",
       "title": "① 寝具・タオル・サウナ類",
       "items": [
-        { "key": "single_sheet_kake", "name": "シングルシーツ(掛け)", "type": "4level", "facilities": "ALL" },
-        { "key": "single_sheet_shiki", "name": "シングルシーツ(敷)", "type": "4level", "facilities": "ALL" },
-        { "key": "double_sheet_kake", "name": "ダブルシーツ(掛け)", "type": "4level", "facilities": ["LUONTO", "ホッポッタ"] },
-        { "key": "double_sheet_shiki", "name": "ダブルシーツ(敷)", "type": "4level", "facilities": ["LUONTO", "ホッポッタ"] },
-        { "key": "pillow_cover", "name": "枕カバー", "type": "4level", "facilities": "ALL" },
-        { "key": "bath_towel", "name": "バスタオル", "type": "4level", "facilities": "ALL" },
-        { "key": "body_towel", "name": "ボディタオル", "type": "4level", "facilities": "ALL" },
-        { "key": "bath_mat", "name": "足ふきマット", "type": "4level", "facilities": "ALL" },
-        { "key": "sauna_towel", "name": "サウナ用タオル", "type": "4level", "facilities": "ALL" },
-        { "key": "sauna_mat", "name": "サウナ用マット", "type": "4level", "facilities": "ALL" },
-        { "key": "sauna_pants", "name": "サウナ用パンツ", "type": "4level", "facilities": ["LUONTO", "kukka"] }
+        { "key": "single_sheet_kake", "name": "シングルシーツ(掛け)", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "single_sheet_shiki", "name": "シングルシーツ(敷)", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "double_sheet_kake", "name": "ダブルシーツ(掛け)", "type": "4level", "category": "cleaning", "facilities": ["LUONTO", "ホッポッタ"] },
+        { "key": "double_sheet_shiki", "name": "ダブルシーツ(敷)", "type": "4level", "category": "cleaning", "facilities": ["LUONTO", "ホッポッタ"] },
+        { "key": "pillow_cover", "name": "枕カバー", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "bath_towel", "name": "バスタオル", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "body_towel", "name": "ボディタオル", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "bath_mat", "name": "足ふきマット", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "sauna_towel", "name": "サウナ用タオル", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "sauna_mat", "name": "サウナ用マット", "type": "4level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "sauna_pants", "name": "サウナ用パンツ", "type": "4level", "category": "cleaning", "facilities": ["LUONTO", "kukka"] }
       ]
     },
     {
       "id": "sec_wash_bath",
       "title": "② 洗面所・バス・ランドリー",
       "items": [
-        { "key": "toothbrush", "name": "歯ブラシ", "type": "4level", "facilities": "ALL" },
-        { "key": "body_sponge", "name": "ボディスポンジ", "type": "4level", "facilities": "ALL" },
-        { "key": "hair_brush", "name": "ヘアブラシ", "type": "4level", "facilities": ["LUONTO", "kukka"] },
-        { "key": "wash_handsoap", "name": "洗面所用ハンドソープ", "type": "2level", "facilities": "ALL" },
-        { "key": "paper_towel_hard", "name": "手拭き用ペーパータオル(硬)", "type": "4level", "facilities": ["LUONTO", "kukka", "sch-sch"] },
-        { "key": "shampoo", "name": "シャンプー", "type": "2level", "facilities": "ALL" },
-        { "key": "conditioner", "name": "コンディショナー", "type": "2level", "facilities": "ALL" },
-        { "key": "body_soap", "name": "ボディソープ", "type": "2level", "facilities": "ALL" },
-        { "key": "cleansing", "name": "クレンジング", "type": "2level", "facilities": "ALL" },
-        { "key": "bath_detergent", "name": "風呂用洗剤", "type": "2level", "facilities": "ALL" },
-        { "key": "laundry_detergent", "name": "洗濯用洗剤", "type": "2level", "facilities": "ALL" }
+        { "key": "toothbrush", "name": "歯ブラシ", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "body_sponge", "name": "ボディスポンジ", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "hair_brush", "name": "ヘアブラシ", "type": "4level", "category": "consumable", "facilities": ["LUONTO", "kukka"] },
+        { "key": "wash_handsoap", "name": "洗面所用ハンドソープ", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "paper_towel_hard", "name": "手拭き用ペーパータオル(硬)", "type": "4level", "category": "consumable", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "shampoo", "name": "シャンプー", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "conditioner", "name": "コンディショナー", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "body_soap", "name": "ボディソープ", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "cleansing", "name": "クレンジング", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "bath_detergent", "name": "風呂用洗剤", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "kabikiller", "name": "カビキラー", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "laundry_detergent", "name": "洗濯用洗剤", "type": "2level", "category": "consumable", "facilities": "ALL" }
       ]
     },
     {
       "id": "sec_kitchen_cafe",
       "title": "③ キッチン・カフェ・調味料",
       "items": [
-        { "key": "kitchen_hand_towel", "name": "キッチン用お手拭きタオル", "type": "2level", "facilities": "ALL" },
-        { "key": "kitchen_dish_cloth", "name": "キッチン用食器拭き", "type": "2level", "facilities": "ALL" },
-        { "key": "dish_dry_mat", "name": "食器乾燥エリア用マット", "type": "2level", "facilities": "ALL" },
-        { "key": "dish_detergent", "name": "食器洗い洗剤", "type": "2level", "facilities": "ALL" },
-        { "key": "kitchen_handsoap", "name": "キッチン用ハンドソープ", "type": "2level", "facilities": "ALL" },
-        { "key": "dish_sponge", "name": "食器洗い用スポンジ", "type": "4level", "facilities": "ALL" },
-        { "key": "kitchen_net", "name": "キッチンネット", "type": "4level", "facilities": "ALL" },
-        { "key": "nonwoven_towel", "name": "不織布タオル", "type": "4level", "facilities": "ALL" },
-        { "key": "kitchen_paper", "name": "キッチンペーパー", "type": "4level", "facilities": "ALL" },
-        { "key": "saran_wrap", "name": "サランラップ", "type": "4level", "facilities": "ALL" },
-        { "key": "aluminum_foil", "name": "アルミホイル", "type": "2level", "facilities": "ALL" },
-        { "key": "salt", "name": "塩", "type": "2level", "facilities": "ALL" },
-        { "key": "pepper", "name": "胡椒", "type": "2level", "facilities": "ALL" },
-        { "key": "coffee_beans", "name": "コーヒー豆", "type": "2level", "facilities": "ALL" },
-        { "key": "black_tea", "name": "紅茶", "type": "2level", "facilities": "ALL" }
+        { "key": "kitchen_hand_towel", "name": "キッチン用お手拭きタオル", "type": "2level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "kitchen_dish_cloth", "name": "キッチン用食器拭き", "type": "2level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "dish_dry_mat", "name": "食器乾燥エリア用マット", "type": "2level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "dish_detergent", "name": "食器洗い洗剤", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "cainz_koge_otoshi", "name": "カインズのコゲ落とし", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "kitchen_handsoap", "name": "キッチン用ハンドソープ", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "dish_sponge", "name": "食器洗い用スポンジ", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "kitchen_net", "name": "キッチンネット", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "nonwoven_towel", "name": "不織布タオル", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "kitchen_paper", "name": "キッチンペーパー", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "saran_wrap", "name": "サランラップ", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "aluminum_foil", "name": "アルミホイル", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "salt", "name": "塩", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "pepper", "name": "胡椒", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "coffee_beans", "name": "コーヒー豆", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "black_tea", "name": "紅茶", "type": "2level", "category": "consumable", "facilities": "ALL" }
       ]
     },
     {
       "id": "sec_toilet_room",
       "title": "④ トイレ・室内・清掃用品",
       "items": [
-        { "key": "toilet_paper", "name": "トイレットペーパー", "type": "number", "unit": "残りロール数", "facilities": "ALL" },
-        { "key": "toilet_towel", "name": "トイレ用タオル", "type": "2level", "facilities": ["kukka", "sch-sch"] },
-        { "key": "toilet_floormat", "name": "トイレ用フロアマット", "type": "2level", "facilities": "ALL" },
-        { "key": "toilet_wiper", "name": "トイレ用掃除シート", "type": "number", "unit": "残りパック数", "facilities": "ALL" },
-        { "key": "toilet_detergent", "name": "便器用洗剤(装着型ブラシ)", "type": "2level", "facilities": "ALL" },
-        { "key": "vinyl_gloves", "name": "ビニール手袋", "type": "2level", "facilities": "ALL" },
-        { "key": "tissue", "name": "ティッシュ", "type": "4level", "facilities": "ALL" },
-        { "key": "slippers", "name": "スリッパ", "type": "2level", "facilities": "ALL" }
+        { "key": "toilet_paper", "name": "トイレットペーパー", "type": "number", "unit": "残りロール数", "category": "consumable", "facilities": "ALL" },
+        { "key": "toilet_towel", "name": "トイレ用タオル", "type": "2level", "category": "cleaning", "facilities": ["kukka", "sch-sch"] },
+        { "key": "toilet_floormat", "name": "トイレ用フロアマット", "type": "2level", "category": "cleaning", "facilities": "ALL" },
+        { "key": "toilet_wiper", "name": "トイレ用掃除シート", "type": "number", "unit": "残りパック数", "category": "consumable", "facilities": "ALL" },
+        { "key": "toilet_detergent", "name": "便器用洗剤(装着型ブラシ)", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "utamaro", "name": "ウタマロ", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "vinyl_gloves", "name": "ビニール手袋", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "zoukin", "name": "ぞうきん", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "tissue", "name": "ティッシュ", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "slippers", "name": "スリッパ", "type": "2level", "category": "consumable", "facilities": "ALL" }
       ]
     },
     {
       "id": "sec_bags",
       "title": "⑤ 袋類（ゴミ袋・ランドリー袋）",
       "items": [
-        { "key": "garbage_burn_xl", "name": "指定ゴミ袋可燃特大", "type": "4level", "facilities": "ALL" },
-        { "key": "garbage_burn_l", "name": "指定ゴミ袋可燃大", "type": "4level", "facilities": "ALL" },
-        { "key": "garbage_burn_s", "name": "指定ゴミ袋可燃小", "type": "4level", "facilities": "ALL" },
-        { "key": "garbage_nonburn_l", "name": "指定ゴミ袋ビンカン不燃大", "type": "4level", "facilities": "ALL" },
-        { "key": "garbage_nonburn_s", "name": "指定ゴミ袋ビンカン不燃小", "type": "4level", "facilities": "ALL" },
-        { "key": "laundry_bag", "name": "クリーニング用45Lゴミ袋", "type": "4level", "facilities": "ALL" },
-        { "key": "washroom_bag_30l", "name": "洗面所用ゴミ袋30L", "type": "2level", "facilities": "ALL" }
+        { "key": "garbage_burn_xl", "name": "指定ゴミ袋可燃特大", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "garbage_burn_l", "name": "指定ゴミ袋可燃大", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "garbage_burn_s", "name": "指定ゴミ袋可燃小", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "garbage_nonburn_l", "name": "指定ゴミ袋ビンカン不燃大", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "garbage_nonburn_s", "name": "指定ゴミ袋ビンカン不燃小", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "laundry_bag", "name": "クリーニング用45Lゴミ袋", "type": "4level", "category": "consumable", "facilities": "ALL" },
+        { "key": "washroom_bag_30l", "name": "洗面所用ゴミ袋30L", "type": "2level", "category": "consumable", "facilities": "ALL" }
       ]
     },
     {
       "id": "sec_bbq",
-      "title": "⑥ BBQ用品",
+      "title": "⑥ BBQ用品・薪ストーブ",
       "items": [
-        { "key": "bbq_igniter", "name": "BBQ着火剤", "type": "2level", "facilities": "ALL" },
-        { "key": "bbq_lighter", "name": "BBQ用チャッカマン", "type": "2level", "facilities": ["LUONTO", "kukka", "sch-sch"] },
-        { "key": "bbq_charcoal", "name": "BBQ炭", "type": "number", "unit": "箱数", "facilities": ["LUONTO", "kukka", "sch-sch"] },
-        { "key": "bbq_plate_l", "name": "BBQ紙皿大", "type": "2level", "facilities": "ALL" },
-        { "key": "bbq_plate_s", "name": "BBQ紙皿小", "type": "2level", "facilities": "ALL" },
-        { "key": "bbq_chopsticks", "name": "BBQ割りばし", "type": "2level", "facilities": "ALL" },
-        { "key": "bbq_mosquito", "name": "BBQ蚊取り線香", "type": "2level", "facilities": "ALL" }
+        { "key": "bbq_igniter", "name": "BBQ着火剤", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "bbq_lighter", "name": "BBQ用チャッカマン", "type": "2level", "category": "consumable", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "bbq_charcoal", "name": "BBQ炭", "type": "number", "unit": "箱数", "category": "consumable", "facilities": ["LUONTO", "kukka", "sch-sch"] },
+        { "key": "bbq_plate_l", "name": "BBQ紙皿大", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "bbq_plate_s", "name": "BBQ紙皿小", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "bbq_chopsticks", "name": "BBQ割りばし", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "bbq_mosquito", "name": "BBQ蚊取り線香", "type": "2level", "category": "consumable", "facilities": "ALL" },
+        { "key": "wood_stove_spray", "name": "薪ストーブ用スプレー", "type": "2level", "category": "consumable", "facilities": "ALL" }
       ]
     }
   ],

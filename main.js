@@ -17,10 +17,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     analytics: true
   }, APP_CONFIG.modules || {});
 
-  // ★ 備品マスタ定義（config.js の APP_CONFIG から取得）
+  // ★ 備品マスタ定義（config.js の APP_CONFIG から取得・未定義時フォールバック付き）
   const INVENTORY_SECTIONS = Array.isArray(APP_CONFIG.inventorySections) ? APP_CONFIG.inventorySections : [];
   const COMMON_EQUIPMENT_SECTIONS = Array.isArray(APP_CONFIG.commonEquipments) ? APP_CONFIG.commonEquipments : [];
   const FACILITY_LIST = Array.isArray(APP_CONFIG.inventoryFacilities) ? APP_CONFIG.inventoryFacilities : [];
+
+  const SHORTAGE_CATEGORIES = (Array.isArray(APP_CONFIG.inventoryShortageCategories) && APP_CONFIG.inventoryShortageCategories.length > 0)
+    ? APP_CONFIG.inventoryShortageCategories
+    : [
+        {
+          id: 'cleaning',
+          label: 'クリーニング・洗濯物',
+          icon: '🧺',
+          shortTag: '🧺',
+          zeroStatusLabel: '🚨 施設現物なし（回収・配布要）',
+          lowStatusLabel: '⚠️ 施設現物少（回収・配布確認）',
+          emptyMessage: '✅ 現在、回収・配布が必要なクリーニング・洗濯物はありません。'
+        },
+        {
+          id: 'consumable',
+          label: '消耗品',
+          icon: '🛒',
+          shortTag: '🛒',
+          zeroStatusLabel: '🚨 在庫無（至急購入・補充）',
+          lowStatusLabel: '⚠️ 在庫少（購入・配布検討）',
+          emptyMessage: '✅ 現在、購入・補充が必要な消耗品はありません。'
+        }
+      ];
+
+  const DEFAULT_INV_LEVELS = {
+    '4level': [
+      { value: '多', cls: 'sel-good', shortage: false, isZero: false },
+      { value: '中', cls: 'sel-mid', shortage: false, isZero: false },
+      { value: '極小', cls: 'sel-crit', shortage: true, isZero: false },
+      { value: '無', cls: 'sel-zero', shortage: true, isZero: true }
+    ],
+    '2level': [
+      { value: '多', cls: 'sel-good', shortage: false, isZero: false },
+      { value: '少', cls: 'sel-low', shortage: true, isZero: false },
+      { value: '無', cls: 'sel-zero', shortage: true, isZero: true }
+    ],
+    legacyShortageValues: ['少'],
+    numberThreshold: { zeroValue: 0, shortageMax: 1 }
+  };
+
+  const INVENTORY_LEVELS = Object.assign({}, DEFAULT_INV_LEVELS, APP_CONFIG.inventoryLevels || {});
+  const MEMO_CONFIG = Object.assign({
+    enabled: true,
+    commonEnabled: true,
+    maxLength: 100,
+    placeholder: '例：購入済み・配布待ち / kukkaから要運搬 など'
+  }, APP_CONFIG.inventoryMemoConfig || {});
 
   let currentLang = localStorage.getItem('app_lang') || 'ja';
 
@@ -29,8 +76,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isAdminUser = false;
   let currentMyUserId = '';
   let inventoryCache = {};
+  let inventoryMemoCache = {};
+  let serverMemoEnabled = true;
+  let effectiveMemoMaxLength = MEMO_CONFIG.maxLength || 100;
   let currentInvTab = FACILITY_LIST[0] || 'SHORTAGE';
+  let currentShortageCat = (SHORTAGE_CATEGORIES[0] && SHORTAGE_CATEGORIES[0].id) ? SHORTAGE_CATEGORIES[0].id : 'cleaning';
   let openSectionsMap = {}; // アコーディオン開閉状態の保持用
+
+  // ★ 共有メモ編集UIのローカル状態管理（再描画時の入力保護・二重送信防止）
+  let editingMemoMap = {};
+  let memoDraftMap = {};
+  const memoSavingMap = {};
 
   // ★ 管理者メニュー用ステートキャッシュ
   let adminStateCache = null;
@@ -221,7 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return key;
   }
 
-  // XSS・表示崩れ防止用HTMLエスケープ関数（ユーザー入力値・動的表示用）
+  // XSS・表示崩れ防止用HTMLエスケープ関数（ユーザー入力値・共有メモ・動的表示用）
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -1060,8 +1116,81 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==========================================
-  // ★ スタッフ専用：貸別荘備品管理アプリ機能群
+  // ★ スタッフ専用：貸別荘備品管理アプリ機能群（設定マスタ駆動・共有メモ＆区分別要補充対応）
   // ==========================================
+  function isMemoFeatureEnabled(facilityKey) {
+    if (!serverMemoEnabled || !MEMO_CONFIG.enabled) return false;
+    if (facilityKey === 'COMMON' && MEMO_CONFIG.commonEnabled === false) return false;
+    return true;
+  }
+
+  function getLevelOptions(itemType) {
+    if (Array.isArray(INVENTORY_LEVELS[itemType])) {
+      return INVENTORY_LEVELS[itemType];
+    }
+    return [];
+  }
+
+  function getItemCategoryId(itemDef) {
+    if (itemDef && itemDef.category) return itemDef.category;
+    return (SHORTAGE_CATEGORIES[SHORTAGE_CATEGORIES.length - 1] || { id: 'consumable' }).id;
+  }
+
+  function getShortageCategoryDef(catId) {
+    return SHORTAGE_CATEGORIES.find(c => c.id === catId) || SHORTAGE_CATEGORIES[0];
+  }
+
+  function getNumberThreshold() {
+    const th = INVENTORY_LEVELS.numberThreshold || {};
+    return {
+      zeroValue: (th.zeroValue !== undefined) ? Number(th.zeroValue) : 0,
+      shortageMax: (th.shortageMax !== undefined) ? Number(th.shortageMax) : 1
+    };
+  }
+
+  // 品目が「無（0／欠品）」状態かどうか判定するヘルパー
+  function isItemZero(itemDef, entry) {
+    if (!entry || entry.v === undefined || entry.v === null || entry.v === '') return false;
+    if (itemDef.type === 'number') {
+      const num = parseInt(entry.v, 10);
+      return !isNaN(num) && num <= getNumberThreshold().zeroValue;
+    }
+    const opts = getLevelOptions(itemDef.type);
+    const matched = opts.find(o => o.value === entry.v);
+    if (matched) return Boolean(matched.isZero);
+    return entry.v === '無';
+  }
+
+  // 品目が「要補充（無・極小・少・旧値互換 または 実数が閾値以下）」かどうか判定するヘルパー
+  function isItemShortage(itemDef, entry) {
+    if (!entry || entry.v === undefined || entry.v === null || entry.v === '') return false;
+    if (itemDef.type === 'number') {
+      const num = parseInt(entry.v, 10);
+      return !isNaN(num) && num <= getNumberThreshold().shortageMax;
+    }
+    const opts = getLevelOptions(itemDef.type);
+    const matched = opts.find(o => o.value === entry.v);
+    if (matched) return Boolean(matched.shortage);
+    const legacyVals = Array.isArray(INVENTORY_LEVELS.legacyShortageValues) ? INVENTORY_LEVELS.legacyShortageValues : ['少'];
+    return legacyVals.includes(entry.v);
+  }
+
+  // 現行ボタン定義外の旧ステータス値（例：4levelに保存された旧「少」）が残っているか判定
+  function isLegacyStatusValue(itemDef, entry) {
+    if (!entry || entry.v === undefined || entry.v === null || entry.v === '') return false;
+    if (itemDef.type === 'number') return false;
+    const opts = getLevelOptions(itemDef.type);
+    if (opts.length === 0) return false;
+    return !opts.some(o => o.value === entry.v);
+  }
+
+  function getMemoEntry(facilityKey, itemKey) {
+    if (!inventoryMemoCache[facilityKey]) return null;
+    const entry = inventoryMemoCache[facilityKey][itemKey];
+    if (!entry || !entry.m) return null;
+    return entry;
+  }
+
   async function openStaffInventoryApp() {
     if (!MODULES.inventory) return;
 
@@ -1086,6 +1215,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (json.status === 'success') {
         inventoryCache = json.inventory || {};
+        inventoryMemoCache = json.memos || {};
+        serverMemoEnabled = (json.memoEnabled !== false);
+        const cfgMax = Number(MEMO_CONFIG.maxLength || 100);
+        const srvMax = Number(json.memoMaxLength || cfgMax);
+        effectiveMemoMaxLength = Math.max(10, Math.min(cfgMax, srvMax));
+        editingMemoMap = {};
+        memoDraftMap = {};
         renderStaffInventoryScreen();
       } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
         triggerReauthWithState({ screen: 'staffInventory' });
@@ -1099,16 +1235,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('通信エラーが発生しました: ' + e.message);
       renderTopMenu();
     }
-  }
-
-  // 品目が「要補充（少・極小 または 数値が1以下）」かどうか判定するヘルパー
-  function isItemShortage(itemDef, entry) {
-    if (!entry || entry.v === undefined || entry.v === null || entry.v === '') return false;
-    if (itemDef.type === 'number') {
-      const num = parseInt(entry.v, 10);
-      return !isNaN(num) && num <= 1;
-    }
-    return entry.v === '少' || entry.v === '極小';
   }
 
   // 特定施設・特定セクションの対象品目リストを返す
@@ -1135,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // サーバーへ1品目の更新を非同期オートセーブする関数（450msデバウンスで連打時の通信追い越しを防止）
+  // サーバーへ1品目の在庫更新を非同期オートセーブする関数（450msデバウンスで連打時の通信追い越しを防止）
   function autoSaveInventoryItem(facilityKey, itemKey, newVal, newDate) {
     if (!inventoryCache[facilityKey]) inventoryCache[facilityKey] = {};
     inventoryCache[facilityKey][itemKey] = { v: newVal, d: newDate };
@@ -1195,17 +1321,89 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 450);
   }
 
-  function renderStaffInventoryScreen() {
-    // 全施設の要補充件数をカウント
-    let totalShortageCount = 0;
+  // サーバーへ1品目の共有メモを明示保存する関数（文字入力ごとのAPI連打防止＆二重送信ガード）
+  async function saveInventoryMemo(facilityKey, itemKey, rawMemoText) {
+    const mapKey = `${facilityKey}__${itemKey}`;
+    if (memoSavingMap[mapKey]) return;
+
+    const idToken = liff.getIDToken();
+    if (!idToken) {
+      triggerReauthWithState({ screen: 'staffInventory' });
+      return;
+    }
+
+    const cleanMemo = String(rawMemoText || '').trim().substring(0, effectiveMemoMaxLength);
+    memoSavingMap[mapKey] = true;
+    inFlightSaveCount++;
+    updateSaveStatusBadge('saving', '⏳ メモ保存中...');
+    renderStaffInventoryScreen();
+
+    try {
+      const response = await fetch(APP_CONFIG.GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'inv_memo_update',
+          idToken: idToken,
+          facility: facilityKey,
+          itemKey: itemKey,
+          memo: cleanMemo
+        })
+      });
+      const json = await response.json();
+      delete memoSavingMap[mapKey];
+      inFlightSaveCount = Math.max(0, inFlightSaveCount - 1);
+
+      if (json.status === 'success') {
+        if (!inventoryMemoCache[facilityKey]) inventoryMemoCache[facilityKey] = {};
+        if (json.updated && json.updated.m) {
+          inventoryMemoCache[facilityKey][itemKey] = json.updated;
+        } else {
+          delete inventoryMemoCache[facilityKey][itemKey];
+        }
+        delete editingMemoMap[mapKey];
+        delete memoDraftMap[mapKey];
+        renderStaffInventoryScreen();
+        if (inFlightSaveCount === 0 && Object.keys(saveDebounceTimers).length === 0) {
+          updateSaveStatusBadge('ok', cleanMemo ? '✓ メモ保存済' : '✓ メモ消去済');
+        }
+      } else if (json.code === 'TOKEN_EXPIRED' || json.code === 'AUTH_ERROR') {
+        triggerReauthWithState({ screen: 'staffInventory' });
+      } else {
+        renderStaffInventoryScreen();
+        updateSaveStatusBadge('error', '⚠️ メモ保存失敗');
+        alert('メモの保存に失敗しました: ' + (json.message || ''));
+      }
+    } catch (e) {
+      delete memoSavingMap[mapKey];
+      inFlightSaveCount = Math.max(0, inFlightSaveCount - 1);
+      renderStaffInventoryScreen();
+      updateSaveStatusBadge('error', '⚠️ 通信エラー');
+      alert('通信エラーが発生しました: ' + e.message);
+    }
+  }
+
+  // 全施設の要補充件数をカテゴリ別に集計するヘルパー
+  function countShortagesByCategory() {
+    const counts = { total: 0 };
+    SHORTAGE_CATEGORIES.forEach(cat => { counts[cat.id] = 0; });
+
     FACILITY_LIST.forEach(fac => {
       const facData = inventoryCache[fac] || {};
       INVENTORY_SECTIONS.forEach(sec => {
         getFacilityItemsForSection(sec, fac).forEach(item => {
-          if (isItemShortage(item, facData[item.key])) totalShortageCount++;
+          if (isItemShortage(item, facData[item.key])) {
+            const catId = getItemCategoryId(item);
+            counts.total++;
+            counts[catId] = (counts[catId] || 0) + 1;
+          }
         });
       });
     });
+    return counts;
+  }
+
+  function renderStaffInventoryScreen() {
+    const shortageCounts = countShortagesByCategory();
 
     const isSavingNow = inFlightSaveCount > 0 || Object.keys(saveDebounceTimers).length > 0;
     const badgeClass = isSavingNow ? 'save-status-badge saving' : 'save-status-badge';
@@ -1226,14 +1424,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         ${facilityTabBtnsHtml}
         ${commonTabBtnHtml}
         <button class="inv-tab-btn shortage-tab ${currentInvTab === 'SHORTAGE' ? 'active' : ''}" data-tab="SHORTAGE">
-          🛒要補充(${totalShortageCount})
+          🛒要補充(${shortageCounts.total})
         </button>
       </div>
     `;
 
     let bodyHtml = '';
     if (currentInvTab === 'SHORTAGE') {
-      bodyHtml = renderShortageSummaryHtml();
+      bodyHtml = renderShortageSummaryHtml(shortageCounts);
     } else if (currentInvTab === 'COMMON') {
       bodyHtml = renderCommonEquipmentHtml();
     } else {
@@ -1261,6 +1459,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // 要補充画面内：クリーニング・洗濯物 ／ 消耗品 サブボタン切替イベント
+    document.querySelectorAll('.inv-shortage-cat-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        currentShortageCat = e.currentTarget.getAttribute('data-cat');
+        renderStaffInventoryScreen();
+      });
+    });
+
     // アコーディオン開閉イベント
     document.querySelectorAll('.inv-sec-header').forEach(header => {
       header.addEventListener('click', (e) => {
@@ -1272,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // タイル型ラジオボタン（多/中/少/極小、および共通備品の所在施設）クリックイベント
+    // タイル型ラジオボタン（多/中/極小/無、多/少/無、および共通備品の所在施設）クリックイベント
     document.querySelectorAll('.inv-seg-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const fac = e.currentTarget.getAttribute('data-fac');
@@ -1336,8 +1542,123 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    // 共有メモ：編集エリア開閉ボタン
+    document.querySelectorAll('.inv-memo-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const mapKey = `${fac}__${key}`;
+        editingMemoMap[mapKey] = true;
+        if (memoDraftMap[mapKey] === undefined) {
+          const cur = getMemoEntry(fac, key);
+          memoDraftMap[mapKey] = cur ? cur.m : '';
+        }
+        renderStaffInventoryScreen();
+      });
+    });
+
+    // 共有メモ：入力中の下書き保持＆文字数カウンター更新（APIは叩かない）
+    document.querySelectorAll('.inv-memo-textarea').forEach(ta => {
+      ta.addEventListener('input', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const mapKey = `${fac}__${key}`;
+        memoDraftMap[mapKey] = e.currentTarget.value;
+        const countEl = document.querySelector(`.inv-memo-count[data-map-key="${CSS.escape(mapKey)}"]`);
+        if (countEl) {
+          countEl.textContent = `${e.currentTarget.value.length} / ${effectiveMemoMaxLength}文字`;
+        }
+      });
+    });
+
+    // 共有メモ：明示保存ボタン
+    document.querySelectorAll('.inv-memo-save-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const mapKey = `${fac}__${key}`;
+        const val = (memoDraftMap[mapKey] !== undefined) ? memoDraftMap[mapKey] : '';
+        saveInventoryMemo(fac, key, val);
+      });
+    });
+
+    // 共有メモ：消去ボタン
+    document.querySelectorAll('.inv-memo-clear-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        if (!confirm('この備品の共有メモを消去しますか？')) return;
+        saveInventoryMemo(fac, key, '');
+      });
+    });
+
+    // 共有メモ：閉じる（キャンセル）ボタン
+    document.querySelectorAll('.inv-memo-cancel-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fac = e.currentTarget.getAttribute('data-fac');
+        const key = e.currentTarget.getAttribute('data-key');
+        const mapKey = `${fac}__${key}`;
+        delete editingMemoMap[mapKey];
+        delete memoDraftMap[mapKey];
+        renderStaffInventoryScreen();
+      });
+    });
+
     document.getElementById('btn-inv-reload').addEventListener('click', openStaffInventoryApp);
     document.getElementById('btn-inv-back').addEventListener('click', renderTopMenu);
+  }
+
+  // 全スタッフ共有メモ欄のHTML生成（施設別・施設共通・要補充で共通利用・XSS完全エスケープ）
+  function renderItemMemoBlockHtml(facilityKey, itemKey) {
+    if (!isMemoFeatureEnabled(facilityKey)) return '';
+
+    const mapKey = `${facilityKey}__${itemKey}`;
+    const savedEntry = getMemoEntry(facilityKey, itemKey);
+    const isEditing = Boolean(editingMemoMap[mapKey]);
+    const isSaving = Boolean(memoSavingMap[mapKey]);
+
+    if (isEditing) {
+      const draftText = (memoDraftMap[mapKey] !== undefined) ? memoDraftMap[mapKey] : (savedEntry ? savedEntry.m : '');
+      const clearBtnHtml = savedEntry
+        ? `<button type="button" class="inv-memo-clear-btn" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}" ${isSaving ? 'disabled' : ''}>🗑️ 消去</button>`
+        : '';
+      return `
+        <div class="inv-memo-area">
+          <div class="inv-memo-editor">
+            <textarea class="inv-memo-textarea" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}" maxlength="${effectiveMemoMaxLength}" placeholder="${escapeHtml(MEMO_CONFIG.placeholder)}" ${isSaving ? 'disabled' : ''}>${escapeHtml(draftText)}</textarea>
+            <div class="inv-memo-footer">
+              <span class="inv-memo-count" data-map-key="${escapeHtml(mapKey)}">${draftText.length} / ${effectiveMemoMaxLength}文字</span>
+              <div class="inv-memo-actions">
+                <button type="button" class="inv-memo-cancel-btn" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}" ${isSaving ? 'disabled' : ''}>閉じる</button>
+                ${clearBtnHtml}
+                <button type="button" class="inv-memo-save-btn" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}" ${isSaving ? 'disabled' : ''}>${isSaving ? '保存中...' : '💾 保存'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (savedEntry) {
+      const dateSuffix = savedEntry.d ? `（${escapeHtml(savedEntry.d)}）` : '';
+      return `
+        <div class="inv-memo-area">
+          <div class="inv-memo-preview">
+            <div class="inv-memo-preview-body">
+              <span class="inv-memo-preview-text">📝 ${escapeHtml(savedEntry.m)}</span>
+              <span class="inv-memo-preview-meta">${dateSuffix}</span>
+            </div>
+            <button type="button" class="inv-memo-toggle-btn has-memo" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}">編集</button>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="inv-memo-area">
+        <button type="button" class="inv-memo-toggle-btn" data-fac="${escapeHtml(facilityKey)}" data-key="${escapeHtml(itemKey)}">📝 共有メモを追加</button>
+      </div>
+    `;
   }
 
   // 各施設のサブセクション別HTML生成
@@ -1350,29 +1671,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (items.length === 0) return;
 
       let shortageCount = 0;
+      let zeroCount = 0;
+      let memoCount = 0;
       items.forEach(item => {
+        if (isItemZero(item, facData[item.key])) zeroCount++;
         if (isItemShortage(item, facData[item.key])) shortageCount++;
+        if (isMemoFeatureEnabled(facilityName) && getMemoEntry(facilityName, item.key)) memoCount++;
       });
 
       const mapKey = `${facilityName}_${sec.id}`;
       const isOpen = Boolean(openSectionsMap[mapKey]);
       const arrow = isOpen ? '▼' : '▶';
-      const badgeHtml = shortageCount > 0
-        ? `<span class="badge-warn">⚠️ 要補充 ${shortageCount}</span>`
-        : `<span class="badge-ok">${items.length}品目</span>`;
+
+      let badgesHtml = '';
+      if (memoCount > 0) {
+        badgesHtml += `<span class="badge-memo">📝${memoCount}</span>`;
+      }
+      if (zeroCount > 0) {
+        badgesHtml += `<span class="badge-zero">🚨 無 ${zeroCount}</span>`;
+      }
+      if (shortageCount > zeroCount) {
+        badgesHtml += `<span class="badge-warn">⚠️ 要補充 ${shortageCount - zeroCount}</span>`;
+      } else if (shortageCount === 0) {
+        badgesHtml += `<span class="badge-ok">${items.length}品目</span>`;
+      }
 
       let itemsHtml = '';
       if (isOpen) {
         items.forEach(item => {
-          itemsHtml += renderSingleInventoryItemHtml(facilityName, item, facData[item.key]);
+          itemsHtml += renderSingleInventoryItemHtml(facilityName, item, facData[item.key], false);
         });
       }
 
       html += `
         <div class="inv-section">
-          <button type="button" class="inv-sec-header" data-sec-id="${sec.id}">
+          <button type="button" class="inv-sec-header" data-sec-id="${escapeHtml(sec.id)}">
             <span>${arrow} ${escapeHtml(sec.title)}</span>
-            <div class="inv-sec-badges">${badgeHtml}</div>
+            <div class="inv-sec-badges">${badgesHtml}</div>
           </button>
           <div class="inv-sec-body ${isOpen ? '' : 'hidden'}">
             ${itemsHtml}
@@ -1384,61 +1719,76 @@ document.addEventListener('DOMContentLoaded', async () => {
     return html;
   }
 
-  // 個別備品1行分のHTML生成（4段階・2段階・実数 ＋ 最終確認日＆本日ボタン）
-  function renderSingleInventoryItemHtml(facilityName, item, entry) {
+  // 個別備品1行分のHTML生成（4段階・2段階・実数 ＋ 種別タグ ＋ 最終確認日＆本日ボタン ＋ 共有メモ欄）
+  function renderSingleInventoryItemHtml(facilityName, item, entry, isShortageView = false) {
     const curVal = (entry && entry.v !== undefined) ? entry.v : '';
     const curDate = (entry && entry.d) ? entry.d : '';
     const unitLabel = item.unit ? `<span class="inv-item-unit">（単位：${escapeHtml(item.unit)}）</span>` : '';
 
+    const catDef = getShortageCategoryDef(getItemCategoryId(item));
+    const catTagHtml = catDef && catDef.shortTag
+      ? `<span class="inv-cat-tag" title="${escapeHtml(catDef.label)}">${escapeHtml(catDef.shortTag)}</span>`
+      : '';
+
+    const zeroFlag = isItemZero(item, entry);
+    const legacyFlag = isLegacyStatusValue(item, entry);
+    const zeroPillHtml = zeroFlag ? `<span class="inv-zero-pill">🚨 無</span>` : '';
+
     let controlHtml = '';
-    if (item.type === '4level') {
-      const opts = [
-        { label: '多', cls: 'sel-good' },
-        { label: '中', cls: 'sel-mid' },
-        { label: '少', cls: 'sel-low' },
-        { label: '極小', cls: 'sel-crit' }
-      ];
-      controlHtml = `<div class="inv-seg-group">` + opts.map(o => {
-        const activeCls = (curVal === o.label) ? o.cls : '';
-        return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-val="${o.label}">${o.label}</button>`;
-      }).join('') + `</div>`;
-    } else if (item.type === '2level') {
-      const opts = [
-        { label: '多', cls: 'sel-good' },
-        { label: '少', cls: 'sel-low' }
-      ];
-      controlHtml = `<div class="inv-seg-group">` + opts.map(o => {
-        const activeCls = (curVal === o.label) ? o.cls : '';
-        return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-val="${o.label}">${o.label}</button>`;
-      }).join('') + `</div>`;
-    } else if (item.type === 'number') {
-      const numVal = (curVal !== '' && !isNaN(parseInt(curVal, 10))) ? parseInt(curVal, 10) : 0;
+    if (item.type === 'number') {
+      const hasNumVal = (curVal !== '' && !isNaN(parseInt(curVal, 10)));
+      const numVal = hasNumVal ? parseInt(curVal, 10) : 0;
+      const zeroInputCls = (hasNumVal && numVal <= getNumberThreshold().zeroValue) ? 'is-zero' : '';
       controlHtml = `
         <div class="inv-num-group">
-          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="-1">－</button>
-          <input type="number" class="inv-num-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${numVal}" min="0" max="9999">
-          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" data-delta="1">＋</button>
+          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}" data-delta="-1">－</button>
+          <input type="number" class="inv-num-input ${zeroInputCls}" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}" value="${numVal}" min="0" max="9999">
+          <button type="button" class="inv-step-btn" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}" data-delta="1">＋</button>
           <span style="font-size:12px; color:#555;">${escapeHtml(item.unit || '')}</span>
         </div>
       `;
+    } else {
+      const opts = getLevelOptions(item.type);
+      controlHtml = `<div class="inv-seg-group">` + opts.map(o => {
+        const activeCls = (curVal === o.value) ? o.cls : '';
+        return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}" data-val="${escapeHtml(o.value)}">${escapeHtml(o.value)}</button>`;
+      }).join('') + `</div>`;
     }
 
+    const legacyNoteHtml = legacyFlag
+      ? `<div class="inv-legacy-note">⚠️ 旧ステータス「${escapeHtml(curVal)}」が登録中です（上の新ボタンで再選択してください）</div>`
+      : '';
+
+    let shortageStatusBarHtml = '';
+    if (isShortageView && catDef) {
+      const statusText = zeroFlag ? catDef.zeroStatusLabel : catDef.lowStatusLabel;
+      const statusCls = zeroFlag ? 'shortage-status-zero' : 'shortage-status-low';
+      shortageStatusBarHtml = `<div class="shortage-status-bar ${statusCls}">${escapeHtml(statusText)}</div>`;
+    }
+
+    const memoHtml = renderItemMemoBlockHtml(facilityName, item.key);
+    const itemWrapCls = (!isShortageView && zeroFlag) ? 'inv-item inv-item-zero' : 'inv-item';
+
     return `
-      <div class="inv-item">
+      <div class="${itemWrapCls}">
+        ${shortageStatusBarHtml}
         <div class="inv-item-top">
-          <span class="inv-item-name">${escapeHtml(item.name)}${unitLabel}</span>
+          <span class="inv-item-name">${catTagHtml}${escapeHtml(item.name)}${unitLabel}</span>
+          ${zeroPillHtml}
         </div>
         ${controlHtml}
+        ${legacyNoteHtml}
         <div class="inv-date-row">
           <span>最終確認:</span>
-          <input type="date" class="inv-date-input" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}" value="${escapeHtml(curDate)}">
-          <button type="button" class="inv-today-btn" data-fac="${escapeHtml(facilityName)}" data-key="${item.key}">本日</button>
+          <input type="date" class="inv-date-input" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}" value="${escapeHtml(curDate)}">
+          <button type="button" class="inv-today-btn" data-fac="${escapeHtml(facilityName)}" data-key="${escapeHtml(item.key)}">本日</button>
         </div>
+        ${memoHtml}
       </div>
     `;
   }
 
-  // 施設共通備品のHTML生成
+  // 施設共通備品のHTML生成（共有メモ欄対応）
   function renderCommonEquipmentHtml() {
     const commonData = inventoryCache['COMMON'] || {};
     let html = '';
@@ -1452,8 +1802,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const locBtns = FACILITY_LIST.map(facName => {
           const activeCls = (curFac === facName) ? 'sel-loc' : '';
-          return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="COMMON" data-key="${item.key}" data-val="${escapeHtml(facName)}" style="font-size:11px;">${escapeHtml(facName)}</button>`;
+          return `<button type="button" class="inv-seg-btn ${activeCls}" data-fac="COMMON" data-key="${escapeHtml(item.key)}" data-val="${escapeHtml(facName)}" style="font-size:11px;">${escapeHtml(facName)}</button>`;
         }).join('');
+
+        const memoHtml = renderItemMemoBlockHtml('COMMON', item.key);
 
         itemsHtml += `
           <div class="inv-item">
@@ -1463,9 +1815,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="inv-seg-group">${locBtns}</div>
             <div class="inv-date-row">
               <span>最終確認:</span>
-              <input type="date" class="inv-date-input" data-fac="COMMON" data-key="${item.key}" value="${escapeHtml(curDate)}">
-              <button type="button" class="inv-today-btn" data-fac="COMMON" data-key="${item.key}">本日</button>
+              <input type="date" class="inv-date-input" data-fac="COMMON" data-key="${escapeHtml(item.key)}" value="${escapeHtml(curDate)}">
+              <button type="button" class="inv-today-btn" data-fac="COMMON" data-key="${escapeHtml(item.key)}">本日</button>
             </div>
+            ${memoHtml}
           </div>
         `;
       });
@@ -1485,10 +1838,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     return html;
   }
 
-  // 🛒 要補充まとめ（全施設横断リスト・その場で更新も可能）
-  function renderShortageSummaryHtml() {
-    let html = '';
-    let anyShortage = false;
+  // 🛒 要補充まとめ（配下に「クリーニング・洗濯物」「消耗品」ボタンを分離し、種別に応じたステータスを表示）
+  function renderShortageSummaryHtml(shortageCounts) {
+    const activeCatDef = getShortageCategoryDef(currentShortageCat);
+    const activeCatId = activeCatDef.id;
+
+    // サブボタン群（「クリーニング・洗濯物」／「消耗品」等）
+    const subTabsHtml = `
+      <div class="shortage-subtabs">
+        ${SHORTAGE_CATEGORIES.map(cat => {
+          const cnt = shortageCounts[cat.id] || 0;
+          const isAct = (cat.id === activeCatId);
+          return `
+            <button type="button" class="inv-shortage-cat-btn ${isAct ? 'active' : ''}" data-cat="${escapeHtml(cat.id)}">
+              ${escapeHtml(cat.icon || '')} ${escapeHtml(cat.label)} (${cnt})
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    let listHtml = '';
+    let anyShortageInCat = false;
 
     FACILITY_LIST.forEach(fac => {
       const facData = inventoryCache[fac] || {};
@@ -1496,30 +1867,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       INVENTORY_SECTIONS.forEach(sec => {
         getFacilityItemsForSection(sec, fac).forEach(item => {
-          if (isItemShortage(item, facData[item.key])) {
+          if (getItemCategoryId(item) === activeCatId && isItemShortage(item, facData[item.key])) {
             shortageItems.push(item);
           }
         });
       });
 
       if (shortageItems.length > 0) {
-        anyShortage = true;
-        html += `<div class="shortage-fac-title">🏠 ${escapeHtml(fac)} （要補充: ${shortageItems.length}件）</div>`;
+        anyShortageInCat = true;
+        // 「無（0）」を優先して上位表示
+        shortageItems.sort((a, b) => {
+          const az = isItemZero(a, facData[a.key]) ? 0 : 1;
+          const bz = isItemZero(b, facData[b.key]) ? 0 : 1;
+          return az - bz;
+        });
+
+        const zeroCnt = shortageItems.filter(it => isItemZero(it, facData[it.key])).length;
+        const zeroBadge = zeroCnt > 0 ? ` / 🚨無:${zeroCnt}` : '';
+        listHtml += `<div class="shortage-fac-title">🏠 ${escapeHtml(fac)} （${escapeHtml(activeCatDef.label)}: ${shortageItems.length}件${zeroBadge}）</div>`;
         shortageItems.forEach(item => {
-          html += `<div class="shortage-card">${renderSingleInventoryItemHtml(fac, item, facData[item.key])}</div>`;
+          const isZero = isItemZero(item, facData[item.key]);
+          const cardCls = isZero ? 'shortage-card shortage-card-zero' : 'shortage-card';
+          listHtml += `<div class="${cardCls}">${renderSingleInventoryItemHtml(fac, item, facData[item.key], true)}</div>`;
         });
       }
     });
 
-    if (!anyShortage) {
-      html = `
-        <div style="text-align:center; padding:25px 10px; color:#2e7d32; background:#f1f8e9; border-radius:8px; font-size:14px;">
-          ✅ 現在「少」「極小」（または残り1以下）になっている要補充品目はありません。
+    if (!anyShortageInCat) {
+      const emptyMsg = activeCatDef.emptyMessage || '✅ 現在、要補充対象になっている品目はありません。';
+      listHtml = `
+        <div style="text-align:center; padding:25px 10px; color:#2e7d32; background:#f1f8e9; border-radius:8px; font-size:14px; line-height:1.5;">
+          ${escapeHtml(emptyMsg)}
         </div>
       `;
     }
 
-    return html;
+    return subTabsHtml + listHtml;
   }
 
   // ==========================================
